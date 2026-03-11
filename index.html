@@ -1,0 +1,462 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>經典老藝人賓果 Pro - 職能治療師專業版</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- PDF 產生核心庫 -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700;900&display=swap');
+        
+        :root {
+            --primary: #1e293b;
+            --accent: #4f46e5;
+            --bingo-gold: #b45309;
+        }
+
+        body {
+            font-family: 'Noto Sans TC', sans-serif;
+            background-color: #f1f5f9;
+            color: var(--primary);
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        /* 賓果卡樣式 */
+        .bingo-card {
+            background: white;
+            width: 100%;
+            max-width: 210mm;
+            min-height: 297mm;
+            padding: 15mm;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.1);
+            display: flex;
+            flex-direction: column;
+            box-sizing: border-box;
+            margin: 0 auto;
+            position: relative;
+        }
+
+        /* 下載專用的標準 A4 尺寸 */
+        .download-standard {
+            width: 794px !important;
+            height: 1123px !important;
+            padding: 45px !important;
+            position: fixed !important;
+            left: -9999px !important;
+            top: 0 !important;
+            box-shadow: none !important;
+        }
+
+        /* 標記樣式 (紅色印章感) */
+        .marked { 
+            background-color: #fef2f2 !important; 
+            position: relative; 
+        }
+        .marked::after {
+            content: '已抽';
+            position: absolute;
+            font-size: 1.2rem;
+            color: #ef4444;
+            border: 3px solid #ef4444;
+            padding: 2px 6px;
+            border-radius: 4px;
+            text-transform: uppercase;
+            font-weight: 900;
+            transform: rotate(-15deg);
+            opacity: 0.6;
+            z-index: 5;
+        }
+
+        /* 賓果格線 */
+        .bingo-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            grid-template-rows: repeat(4, 1fr);
+            border: 5px solid var(--primary);
+            flex-grow: 1;
+            width: 100%;
+        }
+        .bingo-cell {
+            border: 2px solid var(--primary);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            font-size: clamp(1.4rem, 4vw, 2.8rem);
+            font-weight: 900;
+            padding: 10px;
+            background: white;
+            line-height: 1.1;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .bingo-cell:hover { background-color: #f8fafc; }
+
+        @keyframes roll {
+            0% { transform: translateY(0); opacity: 0.5; }
+            50% { transform: translateY(-10px); opacity: 1; }
+            100% { transform: translateY(0); opacity: 0.5; }
+        }
+        .animate-roll { animation: roll 0.1s infinite; }
+
+        @media print {
+            @page { size: A4 portrait; margin: 0; }
+            .no-print { display: none !important; }
+            body { background: white !important; }
+            #printArea { padding: 0 !important; }
+            .bingo-card {
+                box-shadow: none !important;
+                page-break-after: always;
+            }
+        }
+
+        /* 隱藏捲軸但保持功能 */
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+    </style>
+</head>
+<body class="bg-slate-100 min-h-screen">
+
+    <!-- 加載遮罩 -->
+    <div id="loadingOverlay" class="fixed inset-0 z-[100] flex flex-col items-center justify-center bg-slate-900/90 text-white hidden">
+        <div class="w-16 h-16 border-4 border-indigo-400 border-t-transparent rounded-full animate-spin mb-4"></div>
+        <p class="text-xl font-bold" id="progressText">準備 PDF 中...</p>
+    </div>
+
+    <div class="no-print max-w-6xl mx-auto p-4 md:p-8">
+        <!-- 標題區 -->
+        <header class="flex flex-col md:flex-row justify-between items-center mb-8 gap-4">
+            <div class="text-center md:text-left">
+                <h1 class="text-4xl md:text-5xl font-black text-slate-800 flex items-center gap-3">
+                    <span class="text-indigo-600">📽️</span> 經典藝人賓果
+                </h1>
+                <p class="text-slate-500 font-medium mt-1">黃金年代回憶之旅 ‧ 專業長輩活動設計版</p>
+            </div>
+            <div class="flex gap-2">
+                <button onclick="toggleSound()" id="soundBtn" class="bg-white p-4 rounded-2xl shadow-sm border border-slate-200 hover:bg-slate-50 transition">
+                    <span id="soundIcon" class="text-2xl">🔊</span>
+                </button>
+                <div class="bg-white px-6 py-4 rounded-2xl shadow-sm border border-slate-200">
+                    <span class="text-sm font-bold text-slate-400 block uppercase">名單數量</span>
+                    <span id="count" class="text-2xl font-black text-indigo-600">0</span>
+                </div>
+            </div>
+        </header>
+
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
+            <!-- 左側：控制盤 -->
+            <div class="lg:col-span-4 space-y-6">
+                <!-- 抽籤面板 -->
+                <div class="bg-slate-900 rounded-[2.5rem] p-8 text-center shadow-2xl relative overflow-hidden">
+                    <div class="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-indigo-500 to-transparent opacity-50"></div>
+                    <div id="drawDisplay" class="text-5xl md:text-6xl font-black text-white min-h-[120px] flex items-center justify-center tracking-tight leading-tight">
+                        準備開始
+                    </div>
+                    <button id="drawBtn" onclick="startDraw()" class="w-full bg-indigo-600 text-white py-5 rounded-2xl font-black text-2xl hover:bg-indigo-500 shadow-lg shadow-indigo-900/20 active:scale-95 transition mt-4">
+                        啟動抽籤
+                    </button>
+                    <div class="flex gap-2 mt-4">
+                        <button onclick="resetDraw()" class="flex-1 py-3 bg-slate-800 text-slate-400 rounded-xl font-bold hover:text-white transition text-sm">清除紀錄</button>
+                        <button onclick="speakCurrent()" id="speakBtn" class="flex-1 py-3 bg-slate-800 text-slate-400 rounded-xl font-bold hover:text-white transition text-sm hidden">🔊 朗讀姓名</button>
+                    </div>
+                </div>
+
+                <!-- 名單管理 -->
+                <div class="bg-white p-6 rounded-[2rem] shadow-sm border border-slate-200">
+                    <h2 class="text-xl font-black mb-4 flex items-center text-slate-700">
+                        🖊️ 快速編輯名單
+                    </h2>
+                    <div class="flex gap-2 mb-4">
+                        <input type="text" id="newArtist" placeholder="輸入姓名..." class="flex-1 border-2 border-slate-100 p-3 rounded-xl focus:border-indigo-500 outline-none font-bold">
+                        <button onclick="addArtist()" class="bg-slate-800 text-white px-4 py-3 rounded-xl font-bold hover:bg-black transition">新增</button>
+                    </div>
+                    <div id="artistList" class="flex flex-wrap gap-2 max-h-48 overflow-y-auto no-scrollbar p-1"></div>
+                </div>
+            </div>
+
+            <!-- 右側：歷史與功能 -->
+            <div class="lg:col-span-8 space-y-6">
+                <!-- 已抽出 -->
+                <div class="bg-white p-8 rounded-[2rem] shadow-sm border border-slate-200">
+                    <h2 class="text-xl font-black mb-4 text-slate-400 uppercase tracking-widest">已抽出紀錄</h2>
+                    <div id="historyList" class="flex flex-wrap gap-3 min-h-[60px]">
+                        <p class="text-slate-300 font-medium italic">尚未開始抽籤...</p>
+                    </div>
+                </div>
+
+                <!-- 下載與生成 -->
+                <div class="bg-indigo-50 p-8 rounded-[2.5rem] border-2 border-indigo-100">
+                    <h2 class="text-2xl font-black mb-6 text-indigo-900">🖨️ 製作賓果紙卡</h2>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 items-end">
+                        <div class="space-y-2">
+                            <label class="font-black text-indigo-700 text-sm ml-1">產出張數 (1-50)</label>
+                            <input type="number" id="cardCount" value="5" min="1" max="50" class="w-full bg-white border-2 border-indigo-200 p-4 rounded-2xl text-center font-black text-2xl text-indigo-600">
+                        </div>
+                        <button onclick="generateCards()" class="bg-indigo-600 text-white py-5 rounded-2xl font-black text-lg hover:bg-indigo-700 transition shadow-md">1. 生成預覽</button>
+                        <button onclick="window.print()" class="bg-slate-800 text-white py-5 rounded-2xl font-black hover:bg-black transition text-lg shadow-md">2. 列印 A4</button>
+                        <button onclick="downloadPDF()" class="bg-blue-600 text-white py-5 rounded-2xl font-black hover:bg-blue-700 transition text-lg shadow-xl active:scale-95">3. 下載 PDF</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 預覽區域 -->
+    <div id="printArea" class="py-10 space-y-12"></div>
+
+    <!-- 藝人詳情彈窗 -->
+    <div id="artistModal" class="no-print fixed inset-0 z-50 flex items-center justify-center bg-slate-900/95 backdrop-blur-sm hidden p-4">
+        <div class="bg-white rounded-[3rem] max-w-lg w-full overflow-hidden shadow-2xl animate-in fade-in zoom-in duration-300">
+            <div id="modalHeader" class="h-24 bg-indigo-600 flex flex-col items-center justify-center text-white p-4">
+                <h2 id="modalTitle" class="text-4xl font-black">藝人姓名</h2>
+            </div>
+            <div class="p-8">
+                <div id="modalContentFacts">
+                    <div id="modalFacts" class="space-y-4 text-slate-700 text-xl font-bold leading-relaxed mb-6"></div>
+                </div>
+                <div id="modalContentPhoto" class="hidden mb-6">
+                    <img id="modalImg" src="" alt="照片" class="w-full h-64 object-cover rounded-2xl shadow-inner bg-slate-100">
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <button id="photoBtn" onclick="togglePhotoView()" class="bg-indigo-50 text-indigo-600 py-4 rounded-2xl font-black text-lg">📸 經典照片</button>
+                    <button onclick="closeModal()" class="bg-slate-900 text-white py-4 rounded-2xl font-black text-lg hover:bg-black">關閉視窗</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 輔助下載用 -->
+    <div id="download-clone-box" class="hidden"></div>
+
+    <script>
+        const artistDatabase = {
+            "鄧麗君": { facts: ["亞洲歌姬，首位將華語流行音樂推向全亞洲與日本的歌手", "經典名曲《月亮代表我的心》傳唱至今"], icon: "🌸", img: "https://cdn.ftvnews.com.tw/manasystem/FileData/News/391deb74-45bd-4830-ae31-a72f49e3efd0.jpg" },
+            "鳳飛飛": { facts: ["帽子歌后，以親民形象橫跨歌壇與主持界", "代表作《掌聲響起》是勵志經典"], icon: "👒", img: "https://g.udn.com.tw/community/img/PSN_ARTICLE/maytsai0522/f_6140371_1.jpg" },
+            "劉文正": { facts: ["白馬王子，華語樂壇偶像始祖，開創動感潮流的巨星", "代表作《三月裡的小雨》引發轟動"], icon: "🧣", img: "https://cdn2.ettoday.net/images/6856/e6856008.jpg" },
+            "費玉清": { facts: ["小哥，歌壇長青樹，嗓音清澈優雅，儀態斯文穩重", "代表作《一剪梅》"], icon: "🎤", img: "https://pgw.udn.com.tw/gw/photo.php?u=/photo/2017/01/16/99/3075318.jpg&x=0&y=0&sw=0&sh=0&exp=3600" },
+            "高凌風": { facts: ["青蛙王子，舞台表演以前衛造型與動感舞步著稱", "代表作《燃燒吧！火鳥》"], icon: "🔥", img: "https://pgw.udn.com.tw/gw/photo.php?u=https://uc.udn.com.tw/photo/2025/09/07/105/33084812.png&x=0&y=0&sw=0&sh=0&sl=W&fw=800&exp=3600" },
+            "江蕙": { facts: ["二姐，台語歌壇不朽天后，蟬聯四屆金曲獎最佳女歌手", "代表作《家後》唱出無數台人情感"], icon: "🏺", img: "https://cdn2.ettoday.net/images/1197/d1197494.jpg" },
+            "豬哥亮": { facts: ["秀場天王，招牌馬桶蓋髮型與幽默口條風靡全台", "台灣特有的錄影帶文化標誌"], icon: "📺", img: "https://s.yimg.com/ny/api/res/1.2/JyEVfHbuw19ufoH6ReW8.w--/YXBwaWQ9aGlnaGxhbmRlcjt3PTY0MDtoPTQyNQ--/https://media.zenfs.com/ko/setn.com.tw/eac64b878661ebf531d93f28053d02a3" },
+            "余天": { facts: ["歌壇大哥大，嗓音雄渾大氣，以《榕樹下》紅遍大街小巷"], icon: "🌳", img: "https://assets.juksy.com/files/articles/89170/5ca3360edaa15.png" },
+            "甄妮": { facts: ["鐵肺天后，嗓音渾厚有力，曾獲首屆金鐘獎女歌星獎", "代表作《魯冰花》"], icon: "💎", img: "https://inews.gtimg.com/om_bt/OqldQwcBIDk71CkPUOKGub0ApJin7LHGwwyBM61NDMzwQAA/1000" },
+            "崔苔菁": { facts: ["一代妖姬，動感女神始祖，主持《翠笛銀箏》大受歡迎"], icon: "👑", img: "https://cc.tvbs.com.tw/img/program/upload/2021/11/09/20211109102935-2c413c18.jpg" },
+            "羅大佑": { facts: ["音樂教父，以深刻歌詞開創華語樂壇批判性創作新頁", "代表作《童年》"], icon: "🎸", img: "https://www.cna.com.tw/project/20210816-lotayu/img/lo3.jpg" },
+            "李宗盛": { facts: ["百萬製作人，擅長細膩描寫都會情感", "挖掘並成就了無數天王天后"], icon: "🎹", img: "https://www.mpweekly.com/entertainment/wp-content/uploads/2024/03/58-40thfeature-032-20240304042457.jpg?v=1709526298" },
+            "張學友": { facts: ["歌神，唱功精湛，專輯《吻別》創下華語銷量傳奇"], icon: "🎧", img: "https://attach.setn.com/newsimages/2023/07/22/4250577-PH.jpg" },
+            "劉德華": { facts: ["華仔，四大天王之一，以勤奮敬業與完美形象著稱", "代表作《忘情水》"], icon: "🌟", img: "https://attach.mobile01.com/attach/201901/mobile01-45bcb844fef3a02f13a9fd0c18c05482.jpg" },
+            "郭富城": { facts: ["舞王，動感舞姿風靡全亞洲", "代表作《對你愛不完》"], icon: "🕺", img: "https://attach.setn.com/newsimages/2019/04/05/1862047-XXL.jpg" },
+            "梅艷芳": { facts: ["百變天后，舞台造型極盡華麗，受封『香港的女兒』"], icon: "🌹", img: "https://resize-image.vocus.cc/resize?norotation=true&quality=80&url=https%3A%2F%2Fimages.vocus.cc%2F5986777f-c790-408f-9571-e7085b10b5e4.jpg&width=576&sign=92LD0t4Ax2dmFy2UwLsAvGG2MnvoEfxOQoIT4nmwkZs" },
+            "張國榮": { facts: ["哥哥，藝術氣息濃厚的影視巨星，演技與唱功俱佳"], icon: "📽️", img: "https://media.vogue.com.tw/photos/627c90d7ca862aa43bb3b330/2:3/w_2560%2Cc_limit/1126744768" },
+            "林青霞": { facts: ["影壇女神，從少女演到東方不敗，美貌跨越時空"], icon: "🎞️", img: "https://media.vogue.com.tw/photos/5fbcf0c04ae5fd444836bc99/master/w_1600%2Cc_limit/698d0ac9ly1gkt3xnzb30j20j20xjgqs.jpg" },
+            "蔡琴": { facts: ["絲絨歌后，嗓音低沉醇厚，代表作《恰似你的溫柔》"], icon: "🍷", img: "https://p0.itc.cn/images01/20230321/aa43f8ca23d846a4877793fcb2a46ce3.jpeg" },
+            "潘越雲": { facts: ["文藝歌后，唱腔迷幻細膩，代表作《天天天藍》"], icon: "🥀", img: "https://cc.tvbs.com.tw/img/program/upload/2021/07/28/20210728235910-c34e8526.jpg" },
+            "任賢齊": { facts: ["國民好男人，形象親切健康，代表作《心太軟》"], icon: "🚲", img: "https://i.kfs.io/album/global/132465089,0v1/fit/500x500.jpg" },
+            "伍佰": { facts: ["搖滾天王，與China Blue開創了台式搖滾新巔峰"], icon: "⚡", img: "https://doqvf81n9htmm.cloudfront.net/data/nellhung_175/images/2023/09/0924/5.jpg" },
+            "張清芳": { facts: ["東方不敗歌后，嗓音清亮高亢，80-90年代暢銷紀錄保持人"], icon: "🎶", img: "https://pgw.udn.com.tw/gw/photo.php?u=https://uc.udn.com.tw/photo/2022/02/24/0/16118165.jpg&x=0&y=0&sw=0&sh=0&exp=3600" },
+            "小虎隊": { facts: ["青春偶像始祖，引發全亞洲追星狂熱"], icon: "🐯", img: "https://lineimgomusic.com.tw/img/album/1284561.jpg?v=20200328110655" }
+        };
+
+        let artists = Object.keys(artistDatabase);
+        let drawnArtists = [];
+        let isSoundEnabled = true;
+        let lastWinner = "";
+
+        // 初始化
+        window.onload = () => {
+            renderArtistList();
+            document.getElementById('newArtist').onkeypress = (e) => e.key === 'Enter' && addArtist();
+        };
+
+        function toggleSound() {
+            isSoundEnabled = !isSoundEnabled;
+            document.getElementById('soundIcon').innerText = isSoundEnabled ? '🔊' : '🔇';
+        }
+
+        function renderArtistList() {
+            const container = document.getElementById('artistList');
+            document.getElementById('count').innerText = artists.length;
+            container.innerHTML = [...artists].sort().map(name => `
+                <div class="inline-flex items-center bg-slate-100 px-3 py-1 rounded-full text-sm font-bold border border-slate-200">
+                    ${name}
+                    <button onclick="removeArtist('${name}')" class="ml-2 text-red-400 hover:text-red-600">×</button>
+                </div>
+            `).join('');
+        }
+
+        function addArtist() {
+            const name = document.getElementById('newArtist').value.trim();
+            if (name && !artists.includes(name)) {
+                artists.push(name);
+                document.getElementById('newArtist').value = '';
+                renderArtistList();
+            }
+        }
+
+        function removeArtist(name) {
+            artists = artists.filter(a => a !== name);
+            renderArtistList();
+        }
+
+        function startDraw() {
+            const remaining = artists.filter(a => !drawnArtists.includes(a));
+            if (remaining.length === 0) return alert("全部都抽完了！");
+
+            const btn = document.getElementById('drawBtn');
+            const display = document.getElementById('drawDisplay');
+            btn.disabled = true;
+            display.classList.add('animate-roll');
+
+            let counter = 0;
+            const interval = setInterval(() => {
+                display.innerText = remaining[Math.floor(Math.random() * remaining.length)];
+                if (++counter > 20) {
+                    clearInterval(interval);
+                    const winner = remaining[Math.floor(Math.random() * remaining.length)];
+                    display.innerText = winner;
+                    display.classList.remove('animate-roll');
+                    drawnArtists.push(winner);
+                    lastWinner = winner;
+                    updateHistory();
+                    btn.disabled = false;
+                    document.getElementById('speakBtn').classList.remove('hidden');
+                    setTimeout(() => showArtistDetail(winner), 500);
+                }
+            }, 80);
+        }
+
+        function updateHistory() {
+            const history = document.getElementById('historyList');
+            history.innerHTML = drawnArtists.slice().reverse().map(n => `
+                <span class="bg-indigo-600 text-white px-4 py-2 rounded-xl font-bold shadow-sm">${n}</span>
+            `).join('') || '<p class="text-slate-300 italic font-medium">尚未開始抽籤...</p>';
+        }
+
+        function resetDraw() {
+            if(confirm("確定要重置抽籤紀錄嗎？")) {
+                drawnArtists = [];
+                lastWinner = "";
+                document.getElementById('drawDisplay').innerText = "準備開始";
+                document.getElementById('speakBtn').classList.add('hidden');
+                updateHistory();
+            }
+        }
+
+        function showArtistDetail(name) {
+            const modal = document.getElementById('artistModal');
+            document.getElementById('modalTitle').innerText = name;
+            const data = artistDatabase[name] || { facts: ["備受歡迎的經典藝人。"], img: "" };
+            
+            document.getElementById('modalFacts').innerHTML = data.facts.map(f => `<p>✦ ${f}</p>`).join('');
+            const img = document.getElementById('modalImg');
+            if (data.img) {
+                img.src = data.img;
+                document.getElementById('photoBtn').classList.remove('hidden');
+            } else {
+                document.getElementById('photoBtn').classList.add('hidden');
+            }
+            
+            modal.classList.remove('hidden');
+            if (isSoundEnabled) speakText(name);
+        }
+
+        function togglePhotoView() {
+            document.getElementById('modalContentFacts').classList.toggle('hidden');
+            document.getElementById('modalContentPhoto').classList.toggle('hidden');
+        }
+
+        function closeModal() {
+            document.getElementById('artistModal').classList.add('hidden');
+            document.getElementById('modalContentFacts').classList.remove('hidden');
+            document.getElementById('modalContentPhoto').classList.add('hidden');
+        }
+
+        function speakCurrent() {
+            if (lastWinner) speakText(lastWinner);
+        }
+
+        function speakText(text) {
+            if ('speechSynthesis' in window) {
+                const utterance = new SpeechSynthesisUtterance(text);
+                utterance.lang = 'zh-TW';
+                utterance.rate = 0.8;
+                window.speechSynthesis.speak(utterance);
+            }
+        }
+
+        function generateCards() {
+            if (artists.length < 16) return alert("名單不足 16 位，無法生成賓果卡！");
+            const count = parseInt(document.getElementById('cardCount').value);
+            const area = document.getElementById('printArea');
+            area.innerHTML = '';
+
+            for (let i = 0; i < count; i++) {
+                const card = document.createElement('div');
+                card.className = 'bingo-card shadow-2xl';
+                const pool = [...artists].sort(() => Math.random() - 0.5).slice(0, 16);
+                
+                card.innerHTML = `
+                    <div class="text-center mb-6">
+                        <h1 class="text-5xl font-black mb-2 text-slate-800">經典藝人賓果</h1>
+                        <p class="text-xl text-slate-500 font-bold italic mb-1">重溫黃金年代 ‧ 祝您連線大贏</p>
+                        <p class="text-sm text-slate-400 font-bold">規則：抽出名字後在格子上畫圈，集滿連線即獲勝</p>
+                    </div>
+                    <div class="bingo-grid">${pool.map(n => `<div class="bingo-cell" onclick="this.classList.toggle('marked')">${n}</div>`).join('')}</div>
+                    <div class="mt-8 flex justify-between items-end border-t-2 border-slate-100 pt-6">
+                        <div>
+                            <div class="text-sm font-black text-slate-300">編號：#${(i+1).toString().padStart(3,'0')}</div>
+                            <div class="text-xs font-bold text-slate-300">設計：鍾孟修 職能治療師</div>
+                        </div>
+                        <div class="text-2xl font-black text-slate-800">姓名：_________________</div>
+                    </div>
+                `;
+                area.appendChild(card);
+            }
+            window.scrollTo({ top: area.offsetTop - 50, behavior: 'smooth' });
+        }
+
+        async function downloadPDF() {
+            const originalCards = document.querySelectorAll('.bingo-card');
+            if (originalCards.length === 0) return alert("請先生成預覽！");
+
+            const overlay = document.getElementById('loadingOverlay');
+            const progress = document.getElementById('progressText');
+            overlay.classList.remove('hidden');
+
+            const { jsPDF } = window.jspdf;
+            const pdf = new jsPDF('p', 'mm', 'a4');
+
+            try {
+                for (let i = 0; i < originalCards.length; i++) {
+                    progress.innerText = `正在製作第 ${i+1} 頁...`;
+                    
+                    const clone = originalCards[i].cloneNode(true);
+                    clone.classList.add('download-standard');
+                    document.getElementById('download-clone-box').appendChild(clone);
+
+                    const canvas = await html2canvas(clone, {
+                        scale: 2,
+                        useCORS: true,
+                        backgroundColor: "#ffffff"
+                    });
+
+                    const imgData = canvas.toDataURL('image/jpeg', 0.9);
+                    if (i > 0) pdf.addPage();
+                    pdf.addImage(imgData, 'JPEG', 0, 0, 210, 297);
+                    
+                    document.getElementById('download-clone-box').innerHTML = '';
+                }
+                pdf.save(`經典藝人賓果_共${originalCards.length}張.pdf`);
+            } catch (err) {
+                console.error(err);
+                alert("生成 PDF 發生錯誤，請重試。");
+            } finally {
+                overlay.classList.add('hidden');
+            }
+        }
+    </script>
+</body>
+</html>
