@@ -1,685 +1,710 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>漫步台中中區 - 社區探索實境遊戲</title>
+  <!-- 引入 Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- 引入 React 與 ReactDOM -->
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <!-- 引入 Babel 讓瀏覽器可以直接編譯 JSX -->
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+</head>
+<body class="bg-black">
+  <div id="root"></div>
 
-// 台中中區的社區據點資料 (經緯度與介紹)
-const COMMUNITY_SPOTS = [
-  {
-    id: 'station',
-    name: '台中舊火車站',
-    lat: 24.137494, 
-    lng: 120.684804,
-    description: '建於日治時期的紅磚建築，是台中市的地標，也是我們這趟中區探索之旅的起點！',
-    question: '請問台中舊火車站的主要建築風格是被稱為什麼式？',
-    options: ['巴洛克式', '文藝復興式 (辰野金吾風格)', '哥德式', '現代主義'],
-    correct: 1,
-    visited: false,
-    pastImg: 'https://upload.wikimedia.org/wikipedia/commons/1/1b/%E5%A7%8B%E5%BB%BA%E6%96%BC1905%E5%B9%B4%E7%9A%84%E8%87%BA%E7%81%A3%E8%87%BA%E4%B8%AD%E9%A9%9B_%28%E7%81%AB%E8%BB%8A%E7%AB%99%29_Taichung_Train_Station_of_Taiwan.jpg',
-    presentImg: 'https://i0.wp.com/journey.tw/wp-content/uploads/20181008001502_36.jpg?resize=1100%2C734&quality=99&ssl=1'
-  },
-  {
-    id: 'miyahara',
-    name: '宮原眼科',
-    lat: 24.13783,
-    lng: 120.68345,
-    description: '早期由日本眼科博士宮原武熊所開的眼科醫院，如今由日出集團改建，成為販售冰淇淋與糕點的知名打卡據點。',
-    question: '宮原眼科在日治時期，原本是看哪一科的診所？',
-    options: ['牙科', '眼科', '內科', '外科'],
-    correct: 1,
-    visited: false,
-    pastImg: 'https://dcm.s3.hicloud.net.tw/new/collection/2021-04-01/3452dd47-ab8a-4e8f-aab9-5acee7878c04/ed508781-77cf-44d6-b9e4-463e7ab01b42.jpg',
-    presentImg: 'https://margaret.tw/wp-content/uploads/2020/11/nEO_IMG_DSC09631.jpg'
-  },
-  {
-    id: 'asean',
-    name: '東協廣場',
-    lat: 24.1390538,
-    lng: 120.6841090,
-    description: '中區重要的移工與新住民生活圈，被稱為台中的「小東南亞」，充滿豐富的異國美食與文化能量。',
-    question: '東協廣場早期被老台中人稱為什麼？',
-    options: ['第一廣場', '第二廣場', '東南亞廣場', '移工廣場'],
-    correct: 0,
-    visited: false,
-    pastImg: 'https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEhvy3mmjT2LSyJXHr64zgltT00DsMWMnB0Q7ZA0z7nplz1MKX_UN28bn5ndsyXMxrBkWpBfs1DUe5Q3m4_T-jBv1bCIZVfvtHoq_77pLWnBuHbLEJtnNrOotOCAfreO2s6jH29GHfJsUqY/s640/img081.jpg',
-    presentImg: 'https://travel.taichung.gov.tw/instagram-src/coubzyyv02s'
-  },
-  {
-    id: 'second_market',
-    name: '第二市場',
-    lat: 24.14238,
-    lng: 120.67954,
-    description: '超過百年歷史的傳統市場，呈六角形放射狀建築，裡面藏著魯肉飯、紅茶、菜頭粿等無數在地老饕推薦的美食。',
-    question: '走進第二市場，您會發現它的內部建築動線呈現什麼形狀？',
-    options: ['正方形', '圓形', '六角形放射狀', '三角形'],
-    correct: 2,
-    visited: false,
-    pastImg: 'https://dcm.s3.hicloud.net.tw/new/collection/2021-04-01/b76efda9-90b1-4a5f-8199-ceea9b62186f/513ac3f1-e1f6-45ab-aa37-1c04853f01a5.jpg',
-    presentImg: 'https://imgcdn.cna.com.tw/www/WebPhotos/1024/20230122/1024x768_20230122000092.jpg'
-  },
-  {
-    id: 'liuchuan',
-    name: '柳川水岸步道',
-    lat: 24.1424392,
-    lng: 120.6772764,
-    description: '經過整治後的城市河川，夜晚點燈後非常美麗，是中區居民散步休憩的重要公共空間。',
-    question: '柳川與哪一條河川並列為台中市區的兩大重要河川？',
-    options: ['梅川', '綠川', '旱溪', '大甲溪'],
-    correct: 1,
-    visited: false,
-    pastImg: 'https://curation.culture.tw/api/pic?id=User0a665a46e-92e4-4653-b2d0-782e933b6b61&w=500',
-    presentImg: 'https://travel.taichung.gov.tw/image/50510/1024x768'
-  },
-  {
-    id: 'prefectural_hall',
-    name: '台中州廳',
-    lat: 24.1388953,
-    lng: 120.6787289,
-    description: '台中州廳在日治時期是重要的行政中心，建築華麗且充滿歷史感，與台北市政府舊廈風格相近。',
-    question: '台中州廳是哪一位知名建築師設計的？',
-    options: ['森山松之助', '辰野金吾', '伊東豊雄', '安藤忠雄'],
-    correct: 0,
-    visited: false,
-    pastImg: 'https://www.tonyhuang39.com/tony0608/20080716_15.JPG',
-    presentImg: 'https://www.taichung.gov.tw/media/468752/%E5%8F%B0%E4%B8%AD%E5%B7%9E%E5%BB%B3.jpg'
-  },
-  {
-    id: 'sun_cake',
-    name: '太陽餅博物館 (全安堂)',
-    lat: 24.1398104,
-    lng: 120.6825295,
-    description: '這棟百年紅磚建築早年是藥局，現在則用來傳承台中太陽餅的歷史與手作技藝。',
-    question: '台中名產「太陽餅」早期被稱為什麼？',
-    options: ['老婆餅', '麥芽餅', '月亮餅', '椪餅'],
-    correct: 1,
-    visited: false,
-    pastImg: 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQ8jtrVxGMzPnXy2XMNAB6j2Buw18V5ciKJ4g&s',
-    presentImg: 'https://taichung.travel/content/images/attractions/50376/1024x768_image637711207007468998.jpg'
-  },
-  {
-    id: 'wanchun',
-    name: '萬春宮 (台中媽)',
-    lat: 24.141777,
-    lng: 120.681765,
-    description: '這座兩百多年歷史的廟宇，不僅是中區信仰中心，廟內的古蹟文物更見證了台中市的發展。',
-    question: '萬春宮主要供奉的神明是哪一尊？',
-    options: ['觀世音菩薩', '天上聖母 (媽祖)', '關聖帝君', '土地公'],
-    correct: 1,
-    visited: false,
-    pastImg: 'https://www.lswc.org.tw/tw/style/relic/default/images/img_003.png',
-    presentImg: 'https://upload.wikimedia.org/wikipedia/commons/8/8a/%E5%8F%B0%E4%B8%AD%E8%90%AC%E6%98%A5%E5%AE%AE.jpg'
-  },
-  {
-    id: 'taichung_park',
-    name: '台中公園',
-    lat: 24.1436036,
-    lng: 120.682837,
-    description: '台中市歷史最悠久的公園，園內的「湖心亭」是台中市的象徵地標，承載了無數台中人的美好回憶。',
-    question: '台中公園內最著名的地標，建造於日月湖上的雙拼式涼亭稱為什麼？',
-    options: ['湖心亭', '望月亭', '思源亭', '觀水亭'],
-    correct: 0,
-    visited: false,
-    pastImg: 'https://tcmbdata.culture.tw/api/collection/image/Culture_Place?uid=612816',
-    presentImg: 'https://travel.taichung.gov.tw/instagram-src/cvllcyjjx3z'
-  }
-];
+  <script type="text/babel">
+    const { useState, useEffect, useRef, useCallback } = React;
 
-// 計算兩個經緯度之間的距離 (單位: 公尺)
-const calculateDistance = (lat1, lon1, lat2, lon2) => {
-  const R = 6371e3; // 地球半徑 (公尺)
-  const φ1 = lat1 * Math.PI / 180;
-  const φ2 = lat2 * Math.PI / 180;
-  const Δφ = (lat2 - lat1) * Math.PI / 180;
-  const Δλ = (lon2 - lon1) * Math.PI / 180;
-
-  const a = Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
-    Math.cos(φ1) * Math.cos(φ2) *
-    Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-
-  return R * c; 
-};
-
-export default function App() {
-  const [apiKey, setApiKey] = useState('');
-  const [gameState, setGameState] = useState('welcome'); // 'welcome', 'playing', 'finished'
-  const [spots, setSpots] = useState(COMMUNITY_SPOTS);
-  const [currentSpot, setCurrentSpot] = useState(null); 
-  const [showNotification, setShowNotification] = useState(false);
-  const [quizStep, setQuizStep] = useState('question'); 
-  const [wrongAns, setWrongAns] = useState(null); 
-  const [loading, setLoading] = useState(false);
-  const [errorMsg, setErrorMsg] = useState('');
-  
-  const panoramaRef = useRef(null);
-  const mapContainerRef = useRef(null);
-  const minimapContainerRef = useRef(null); 
-  const minimapRef = useRef(null); 
-  const playerMarkerRef = useRef(null); 
-  const initialLoadRef = useRef(true); 
-
-  // 載入 Google Maps 腳本
-  const loadGoogleMapsScript = (key) => {
-    return new Promise((resolve, reject) => {
-      if (window.google && window.google.maps) {
-        resolve();
-        return;
+    // 台中中區的社區據點資料 (經緯度與介紹)
+    const COMMUNITY_SPOTS = [
+      {
+        id: 'station',
+        name: '台中舊火車站',
+        lat: 24.137494, 
+        lng: 120.684804,
+        description: '建於日治時期的紅磚建築，是台中市的地標，也是我們這趟中區探索之旅的起點！',
+        question: '請問台中舊火車站的主要建築風格是被稱為什麼式？',
+        options: ['巴洛克式', '文藝復興式 (辰野金吾風格)', '哥德式', '現代主義'],
+        correct: 1,
+        visited: false,
+        pastImg: 'https://upload.wikimedia.org/wikipedia/commons/1/1b/%E5%A7%8B%E5%BB%BA%E6%96%BC1905%E5%B9%B4%E7%9A%84%E8%87%BA%E7%81%A3%E8%87%BA%E4%B8%AD%E9%A9%9B_%28%E7%81%AB%E8%BB%8A%E7%AB%99%29_Taichung_Train_Station_of_Taiwan.jpg',
+        presentImg: 'https://i0.wp.com/journey.tw/wp-content/uploads/20181008001502_36.jpg?resize=1100%2C734&quality=99&ssl=1'
+      },
+      {
+        id: 'miyahara',
+        name: '宮原眼科',
+        lat: 24.13783,
+        lng: 120.68345,
+        description: '早期由日本眼科博士宮原武熊所開的眼科醫院，如今由日出集團改建，成為販售冰淇淋與糕點的知名打卡據點。',
+        question: '宮原眼科在日治時期，原本是看哪一科的診所？',
+        options: ['牙科', '眼科', '內科', '外科'],
+        correct: 1,
+        visited: false,
+        pastImg: 'https://dcm.s3.hicloud.net.tw/new/collection/2021-04-01/3452dd47-ab8a-4e8f-aab9-5acee7878c04/ed508781-77cf-44d6-b9e4-463e7ab01b42.jpg',
+        presentImg: 'https://margaret.tw/wp-content/uploads/2020/11/nEO_IMG_DSC09631.jpg'
+      },
+      {
+        id: 'asean',
+        name: '東協廣場',
+        lat: 24.1390538,
+        lng: 120.6841090,
+        description: '中區重要的移工與新住民生活圈，被稱為台中的「小東南亞」，充滿豐富的異國美食與文化能量。',
+        question: '東協廣場早期被老台中人稱為什麼？',
+        options: ['第一廣場', '第二廣場', '東南亞廣場', '移工廣場'],
+        correct: 0,
+        visited: false,
+        pastImg: 'https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEhvy3mmjT2LSyJXHr64zgltT00DsMWMnB0Q7ZA0z7nplz1MKX_UN28bn5ndsyXMxrBkWpBfs1DUe5Q3m4_T-jBv1bCIZVfvtHoq_77pLWnBuHbLEJtnNrOotOCAfreO2s6jH29GHfJsUqY/s640/img081.jpg',
+        presentImg: 'https://travel.taichung.gov.tw/instagram-src/coubzyyv02s'
+      },
+      {
+        id: 'second_market',
+        name: '第二市場',
+        lat: 24.14238,
+        lng: 120.67954,
+        description: '超過百年歷史的傳統市場，呈六角形放射狀建築，裡面藏著魯肉飯、紅茶、菜頭粿等無數在地老饕推薦的美食。',
+        question: '走進第二市場，您會發現它的內部建築動線呈現什麼形狀？',
+        options: ['正方形', '圓形', '六角形放射狀', '三角形'],
+        correct: 2,
+        visited: false,
+        pastImg: 'https://dcm.s3.hicloud.net.tw/new/collection/2021-04-01/b76efda9-90b1-4a5f-8199-ceea9b62186f/513ac3f1-e1f6-45ab-aa37-1c04853f01a5.jpg',
+        presentImg: 'https://imgcdn.cna.com.tw/www/WebPhotos/1024/20230122/1024x768_20230122000092.jpg'
+      },
+      {
+        id: 'liuchuan',
+        name: '柳川水岸步道',
+        lat: 24.1424392,
+        lng: 120.6772764,
+        description: '經過整治後的城市河川，夜晚點燈後非常美麗，是中區居民散步休憩的重要公共空間。',
+        question: '柳川與哪一條河川並列為台中市區的兩大重要河川？',
+        options: ['梅川', '綠川', '旱溪', '大甲溪'],
+        correct: 1,
+        visited: false,
+        pastImg: 'https://curation.culture.tw/api/pic?id=User0a665a46e-92e4-4653-b2d0-782e933b6b61&w=500',
+        presentImg: 'https://travel.taichung.gov.tw/image/50510/1024x768'
+      },
+      {
+        id: 'prefectural_hall',
+        name: '台中州廳',
+        lat: 24.1388953,
+        lng: 120.6787289,
+        description: '台中州廳在日治時期是重要的行政中心，建築華麗且充滿歷史感，與台北市政府舊廈風格相近。',
+        question: '台中州廳是哪一位知名建築師設計的？',
+        options: ['森山松之助', '辰野金吾', '伊東豊雄', '安藤忠雄'],
+        correct: 0,
+        visited: false,
+        pastImg: 'https://www.tonyhuang39.com/tony0608/20080716_15.JPG',
+        presentImg: 'https://www.taichung.gov.tw/media/468752/%E5%8F%B0%E4%B8%AD%E5%B7%9E%E5%BB%B3.jpg'
+      },
+      {
+        id: 'sun_cake',
+        name: '太陽餅博物館 (全安堂)',
+        lat: 24.1398104,
+        lng: 120.6825295,
+        description: '這棟百年紅磚建築早年是藥局，現在則用來傳承台中太陽餅的歷史與手作技藝。',
+        question: '台中名產「太陽餅」早期被稱為什麼？',
+        options: ['老婆餅', '麥芽餅', '月亮餅', '椪餅'],
+        correct: 1,
+        visited: false,
+        pastImg: 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQ8jtrVxGMzPnXy2XMNAB6j2Buw18V5ciKJ4g&s',
+        presentImg: 'https://taichung.travel/content/images/attractions/50376/1024x768_image637711207007468998.jpg'
+      },
+      {
+        id: 'wanchun',
+        name: '萬春宮 (台中媽)',
+        lat: 24.141777,
+        lng: 120.681765,
+        description: '這座兩百多年歷史的廟宇，不僅是中區信仰中心，廟內的古蹟文物更見證了台中市的發展。',
+        question: '萬春宮主要供奉的神明是哪一尊？',
+        options: ['觀世音菩薩', '天上聖母 (媽祖)', '關聖帝君', '土地公'],
+        correct: 1,
+        visited: false,
+        pastImg: 'https://www.lswc.org.tw/tw/style/relic/default/images/img_003.png',
+        presentImg: 'https://upload.wikimedia.org/wikipedia/commons/8/8a/%E5%8F%B0%E4%B8%AD%E8%90%AC%E6%98%A5%E5%AE%AE.jpg'
+      },
+      {
+        id: 'taichung_park',
+        name: '台中公園',
+        lat: 24.1436036,
+        lng: 120.682837,
+        description: '台中市歷史最悠久的公園，園內的「湖心亭」是台中市的象徵地標，承載了無數台中人的美好回憶。',
+        question: '台中公園內最著名的地標，建造於日月湖上的雙拼式涼亭稱為什麼？',
+        options: ['湖心亭', '望月亭', '思源亭', '觀水亭'],
+        correct: 0,
+        visited: false,
+        pastImg: 'https://tcmbdata.culture.tw/api/collection/image/Culture_Place?uid=612816',
+        presentImg: 'https://travel.taichung.gov.tw/instagram-src/cvllcyjjx3z'
       }
-      const script = document.createElement('script');
-      script.src = `https://maps.googleapis.com/maps/api/js?key=${key}&libraries=geometry`;
-      script.async = true;
-      script.defer = true;
-      script.onload = resolve;
-      script.onerror = () => reject(new Error('Google Maps API 載入失敗，請檢查金鑰是否正確。'));
-      document.body.appendChild(script);
-    });
-  };
+    ];
 
-  const startGame = async () => {
-    if (!apiKey) {
-      setErrorMsg('請輸入您的 API Key');
-      return;
-    }
-    setLoading(true);
-    setErrorMsg('');
-    try {
-      await loadGoogleMapsScript(apiKey);
-      setGameState('playing');
-    } catch (err) {
-      setErrorMsg(err.message);
-    } finally {
-      setLoading(false);
-    }
-  };
+    // 計算兩個經緯度之間的距離 (單位: 公尺)
+    const calculateDistance = (lat1, lon1, lat2, lon2) => {
+      const R = 6371e3; // 地球半徑 (公尺)
+      const φ1 = lat1 * Math.PI / 180;
+      const φ2 = lat2 * Math.PI / 180;
+      const Δφ = (lat2 - lat1) * Math.PI / 180;
+      const Δλ = (lon2 - lon1) * Math.PI / 180;
 
-  // 初始化街景與小地圖
-  useEffect(() => {
-    if (gameState === 'playing' && mapContainerRef.current && minimapContainerRef.current) {
-      const startSpot = spots.find(s => s.id === 'station');
-      const svService = new window.google.maps.StreetViewService();
+      const a = Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
+        Math.cos(φ1) * Math.cos(φ2) *
+        Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
+      const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 
-      svService.getPanorama(
-        {
-          location: { lat: startSpot.lat, lng: startSpot.lng },
-          radius: 50,
-          source: window.google.maps.StreetViewSource.OUTDOOR
-        },
-        (data, status) => {
-          if (status === window.google.maps.StreetViewStatus.OK) {
-            const panorama = new window.google.maps.StreetViewPanorama(
-              mapContainerRef.current,
-              {
-                pano: data.location.pano,
-                pov: { heading: 135, pitch: 0 },
-                zoom: 1,
-                addressControl: false, 
-                showRoadLabels: true,
-                linksControl: true,    
-                panControl: false,
-                enableCloseButton: false,
-                fullscreenControl: false,
-                zoomControl: false,
-                clickToGo: true,       
-                disableDoubleClickZoom: true,
-              }
-            );
-            panoramaRef.current = panorama;
-
-            minimapRef.current = new window.google.maps.Map(minimapContainerRef.current, {
-              center: { lat: startSpot.lat, lng: startSpot.lng },
-              zoom: 16,
-              disableDefaultUI: true, 
-              draggable: false,       
-              keyboardShortcuts: false,
-              clickableIcons: false,
-              styles: [
-                {
-                  featureType: "poi",
-                  stylers: [{ visibility: "off" }] 
-                },
-                {
-                  featureType: "transit",
-                  stylers: [{ visibility: "off" }] 
-                }
-              ]
-            });
-
-            playerMarkerRef.current = new window.google.maps.Marker({
-              position: { lat: startSpot.lat, lng: startSpot.lng },
-              map: minimapRef.current,
-              icon: {
-                path: window.google.maps.SymbolPath.FORWARD_CLOSED_ARROW,
-                scale: 5,
-                fillColor: '#10b981', 
-                fillOpacity: 1,
-                strokeWeight: 2,
-                strokeColor: '#ffffff',
-                rotation: 135
-              },
-              zIndex: 999
-            });
-
-            panorama.addListener('position_changed', () => {
-              const pos = panorama.getPosition();
-              if (pos) {
-                if (initialLoadRef.current) {
-                  initialLoadRef.current = false;
-                } else {
-                  checkProximity(pos.lat(), pos.lng());
-                }
-                
-                if (minimapRef.current) minimapRef.current.setCenter(pos);
-                if (playerMarkerRef.current) playerMarkerRef.current.setPosition(pos);
-              }
-            });
-
-            panorama.addListener('pov_changed', () => {
-              if (playerMarkerRef.current) {
-                const pov = panorama.getPov();
-                const icon = playerMarkerRef.current.getIcon();
-                playerMarkerRef.current.setIcon({ ...icon, rotation: pov.heading });
-              }
-            });
-
-          } else {
-            console.error('無法找到官方街景路線');
-          }
-        }
-      );
-    }
-  }, [gameState]);
-
-  const checkProximity = useCallback((currentLat, currentLng) => {
-    setSpots(prevSpots => {
-      let changed = false;
-      let triggeredSpot = null;
-      
-      const newSpots = prevSpots.map(spot => {
-        if (!spot.visited) {
-          const distance = calculateDistance(currentLat, currentLng, spot.lat, spot.lng);
-          if (distance < 40 && !triggeredSpot) {
-            changed = true;
-            triggeredSpot = spot;
-            return { ...spot, visited: true };
-          }
-        }
-        return spot;
-      });
-
-      if (triggeredSpot) {
-        setTimeout(() => triggerNotification(triggeredSpot), 0);
-      }
-      
-      return changed ? newSpots : prevSpots;
-    });
-  }, []);
-
-  const triggerNotification = (spot) => {
-    setCurrentSpot(spot);
-    setQuizStep('question'); 
-    setWrongAns(null);       
-    setShowNotification(true);
-  };
-
-  const handleAnswer = (index) => {
-    if (index === currentSpot.correct) {
-      setQuizStep('correct'); 
-      setWrongAns(null);
-    } else {
-      setWrongAns(index); 
-    }
-  };
-
-  const moveDirection = useCallback((relativeAngle) => {
-    if (!panoramaRef.current) return;
-    const pano = panoramaRef.current;
-    const links = pano.getLinks();
-    if (!links || links.length === 0) return;
-
-    const currentHeading = pano.getPov().heading;
-    const targetHeading = (currentHeading + relativeAngle + 360) % 360;
-
-    let closestLink = null;
-    let minDiff = 360;
-
-    const maxTolerance = (relativeAngle === 0 || relativeAngle === 180) ? 85 : 55;
-
-    links.forEach(link => {
-      let diff = Math.abs(link.heading - targetHeading);
-      if (diff > 180) diff = 360 - diff; 
-      if (diff < minDiff && diff < maxTolerance) {
-        minDiff = diff;
-        closestLink = link;
-      }
-    });
-
-    if (closestLink) {
-      pano.setPano(closestLink.pano);
-      
-      if (relativeAngle === -90 || relativeAngle === 90) {
-        pano.setPov({
-          heading: closestLink.heading, 
-          pitch: pano.getPov().pitch
-        });
-      }
-    }
-  }, []);
-
-  const turnCamera = useCallback((angleDelta) => {
-    if (!panoramaRef.current) return;
-    const pano = panoramaRef.current;
-    const pov = pano.getPov();
-    pano.setPov({ ...pov, heading: pov.heading + angleDelta });
-  }, []);
-
-  useEffect(() => {
-    if (gameState !== 'playing') return;
-
-    const handleKeyDown = (e) => {
-      if(["ArrowUp","ArrowDown","ArrowLeft","ArrowRight"," "].indexOf(e.key) > -1) {
-          e.preventDefault();
-      }
-
-      switch (e.key) {
-        case 'ArrowUp':
-        case 'w':
-        case 'W':
-          moveDirection(0);
-          break;
-        case 'ArrowDown':
-        case 's':
-        case 'S':
-          moveDirection(180);
-          break;
-        case 'ArrowLeft':
-        case 'a':
-        case 'A':
-          moveDirection(-90);
-          break;
-        case 'ArrowRight':
-        case 'd':
-        case 'D':
-          moveDirection(90);
-          break;
-        case 'q':
-        case 'Q':
-          turnCamera(-15);
-          break;
-        case 'e':
-        case 'E':
-          turnCamera(15);
-          break;
-        default:
-          break;
-      }
+      return R * c; 
     };
 
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [gameState, moveDirection, turnCamera]);
+    function App() {
+      const [apiKey, setApiKey] = useState('');
+      const [gameState, setGameState] = useState('welcome'); // 'welcome', 'playing', 'finished'
+      const [spots, setSpots] = useState(COMMUNITY_SPOTS);
+      const [currentSpot, setCurrentSpot] = useState(null); 
+      const [showNotification, setShowNotification] = useState(false);
+      const [quizStep, setQuizStep] = useState('question'); 
+      const [wrongAns, setWrongAns] = useState(null); 
+      const [loading, setLoading] = useState(false);
+      const [errorMsg, setErrorMsg] = useState('');
+      
+      const panoramaRef = useRef(null);
+      const mapContainerRef = useRef(null);
+      const minimapContainerRef = useRef(null); 
+      const minimapRef = useRef(null); 
+      const playerMarkerRef = useRef(null); 
+      const initialLoadRef = useRef(true); 
+
+      // 載入 Google Maps 腳本
+      const loadGoogleMapsScript = (key) => {
+        return new Promise((resolve, reject) => {
+          if (window.google && window.google.maps) {
+            resolve();
+            return;
+          }
+          const script = document.createElement('script');
+          script.src = `https://maps.googleapis.com/maps/api/js?key=${key}&libraries=geometry`;
+          script.async = true;
+          script.defer = true;
+          script.onload = resolve;
+          script.onerror = () => reject(new Error('Google Maps API 載入失敗，請檢查金鑰是否正確。'));
+          document.body.appendChild(script);
+        });
+      };
+
+      const startGame = async () => {
+        if (!apiKey) {
+          setErrorMsg('請輸入您的 API Key');
+          return;
+        }
+        setLoading(true);
+        setErrorMsg('');
+        try {
+          await loadGoogleMapsScript(apiKey);
+          setGameState('playing');
+        } catch (err) {
+          setErrorMsg(err.message);
+        } finally {
+          setLoading(false);
+        }
+      };
+
+      // 初始化街景與小地圖
+      useEffect(() => {
+        if (gameState === 'playing' && mapContainerRef.current && minimapContainerRef.current) {
+          const startSpot = spots.find(s => s.id === 'station');
+          const svService = new window.google.maps.StreetViewService();
+
+          svService.getPanorama(
+            {
+              location: { lat: startSpot.lat, lng: startSpot.lng },
+              radius: 50,
+              source: window.google.maps.StreetViewSource.OUTDOOR
+            },
+            (data, status) => {
+              if (status === window.google.maps.StreetViewStatus.OK) {
+                const panorama = new window.google.maps.StreetViewPanorama(
+                  mapContainerRef.current,
+                  {
+                    pano: data.location.pano,
+                    pov: { heading: 135, pitch: 0 },
+                    zoom: 1,
+                    addressControl: false, 
+                    showRoadLabels: true,
+                    linksControl: true,    
+                    panControl: false,
+                    enableCloseButton: false,
+                    fullscreenControl: false,
+                    zoomControl: false,
+                    clickToGo: true,       
+                    disableDoubleClickZoom: true,
+                  }
+                );
+                panoramaRef.current = panorama;
+
+                minimapRef.current = new window.google.maps.Map(minimapContainerRef.current, {
+                  center: { lat: startSpot.lat, lng: startSpot.lng },
+                  zoom: 16,
+                  disableDefaultUI: true, 
+                  draggable: false,       
+                  keyboardShortcuts: false,
+                  clickableIcons: false,
+                  styles: [
+                    {
+                      featureType: "poi",
+                      stylers: [{ visibility: "off" }] 
+                    },
+                    {
+                      featureType: "transit",
+                      stylers: [{ visibility: "off" }] 
+                    }
+                  ]
+                });
+
+                playerMarkerRef.current = new window.google.maps.Marker({
+                  position: { lat: startSpot.lat, lng: startSpot.lng },
+                  map: minimapRef.current,
+                  icon: {
+                    path: window.google.maps.SymbolPath.FORWARD_CLOSED_ARROW,
+                    scale: 5,
+                    fillColor: '#10b981', 
+                    fillOpacity: 1,
+                    strokeWeight: 2,
+                    strokeColor: '#ffffff',
+                    rotation: 135
+                  },
+                  zIndex: 999
+                });
+
+                panorama.addListener('position_changed', () => {
+                  const pos = panorama.getPosition();
+                  if (pos) {
+                    if (initialLoadRef.current) {
+                      initialLoadRef.current = false;
+                    } else {
+                      checkProximity(pos.lat(), pos.lng());
+                    }
+                    
+                    if (minimapRef.current) minimapRef.current.setCenter(pos);
+                    if (playerMarkerRef.current) playerMarkerRef.current.setPosition(pos);
+                  }
+                });
+
+                panorama.addListener('pov_changed', () => {
+                  if (playerMarkerRef.current) {
+                    const pov = panorama.getPov();
+                    const icon = playerMarkerRef.current.getIcon();
+                    playerMarkerRef.current.setIcon({ ...icon, rotation: pov.heading });
+                  }
+                });
+
+              } else {
+                console.error('無法找到官方街景路線');
+              }
+            }
+          );
+        }
+      }, [gameState]);
+
+      const checkProximity = useCallback((currentLat, currentLng) => {
+        setSpots(prevSpots => {
+          let changed = false;
+          let triggeredSpot = null;
+          
+          const newSpots = prevSpots.map(spot => {
+            if (!spot.visited) {
+              const distance = calculateDistance(currentLat, currentLng, spot.lat, spot.lng);
+              if (distance < 40 && !triggeredSpot) {
+                changed = true;
+                triggeredSpot = spot;
+                return { ...spot, visited: true };
+              }
+            }
+            return spot;
+          });
+
+          if (triggeredSpot) {
+            setTimeout(() => triggerNotification(triggeredSpot), 0);
+          }
+          
+          return changed ? newSpots : prevSpots;
+        });
+      }, []);
+
+      const triggerNotification = (spot) => {
+        setCurrentSpot(spot);
+        setQuizStep('question'); 
+        setWrongAns(null);       
+        setShowNotification(true);
+      };
+
+      const handleAnswer = (index) => {
+        if (index === currentSpot.correct) {
+          setQuizStep('correct'); 
+          setWrongAns(null);
+        } else {
+          setWrongAns(index); 
+        }
+      };
+
+      const moveDirection = useCallback((relativeAngle) => {
+        if (!panoramaRef.current) return;
+        const pano = panoramaRef.current;
+        const links = pano.getLinks();
+        if (!links || links.length === 0) return;
+
+        const currentHeading = pano.getPov().heading;
+        const targetHeading = (currentHeading + relativeAngle + 360) % 360;
+
+        let closestLink = null;
+        let minDiff = 360;
+
+        const maxTolerance = (relativeAngle === 0 || relativeAngle === 180) ? 85 : 55;
+
+        links.forEach(link => {
+          let diff = Math.abs(link.heading - targetHeading);
+          if (diff > 180) diff = 360 - diff; 
+          if (diff < minDiff && diff < maxTolerance) {
+            minDiff = diff;
+            closestLink = link;
+          }
+        });
+
+        if (closestLink) {
+          pano.setPano(closestLink.pano);
+          
+          if (relativeAngle === -90 || relativeAngle === 90) {
+            pano.setPov({
+              heading: closestLink.heading, 
+              pitch: pano.getPov().pitch
+            });
+          }
+        }
+      }, []);
+
+      const turnCamera = useCallback((angleDelta) => {
+        if (!panoramaRef.current) return;
+        const pano = panoramaRef.current;
+        const pov = pano.getPov();
+        pano.setPov({ ...pov, heading: pov.heading + angleDelta });
+      }, []);
+
+      useEffect(() => {
+        if (gameState !== 'playing') return;
+
+        const handleKeyDown = (e) => {
+          if(["ArrowUp","ArrowDown","ArrowLeft","ArrowRight"," "].indexOf(e.key) > -1) {
+              e.preventDefault();
+          }
+
+          switch (e.key) {
+            case 'ArrowUp':
+            case 'w':
+            case 'W':
+              moveDirection(0);
+              break;
+            case 'ArrowDown':
+            case 's':
+            case 'S':
+              moveDirection(180);
+              break;
+            case 'ArrowLeft':
+            case 'a':
+            case 'A':
+              moveDirection(-90);
+              break;
+            case 'ArrowRight':
+            case 'd':
+            case 'D':
+              moveDirection(90);
+              break;
+            case 'q':
+            case 'Q':
+              turnCamera(-15);
+              break;
+            case 'e':
+            case 'E':
+              turnCamera(15);
+              break;
+            default:
+              break;
+          }
+        };
+
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+      }, [gameState, moveDirection, turnCamera]);
 
 
-  if (gameState === 'welcome') {
-    return (
-      <div className="min-h-screen bg-slate-900 text-white flex flex-col items-center justify-center p-4">
-        <div className="max-w-xl w-full bg-slate-800 rounded-2xl p-8 shadow-2xl border border-slate-700">
-          <div className="flex justify-center mb-6">
-            <div className="bg-emerald-500 p-4 rounded-full shadow-lg shadow-emerald-500/30 flex items-center justify-center w-20 h-20">
-              <span className="text-4xl">🧭</span>
-            </div>
-          </div>
-          <h1 className="text-3xl font-bold text-center mb-2">漫步台中中區</h1>
-          <p className="text-slate-400 text-center mb-8">第一人稱社區據點探索實境遊戲</p>
-
-          <div className="bg-slate-700/50 p-6 rounded-xl mb-8 border border-slate-600">
-            <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
-              <span className="text-xl">⌨️</span>
-              操作方式
-            </h2>
-            <div className="grid grid-cols-2 gap-4 text-sm text-slate-300">
-              <div className="flex items-center gap-3">
-                <kbd className="bg-slate-900 px-2 py-1 rounded border border-slate-600 font-mono">W / ↑</kbd> 往前走
-              </div>
-              <div className="flex items-center gap-3">
-                <kbd className="bg-slate-900 px-2 py-1 rounded border border-slate-600 font-mono">S / ↓</kbd> 往後退
-              </div>
-              <div className="flex items-center gap-3">
-                <kbd className="bg-slate-900 px-2 py-1 rounded border border-slate-600 font-mono">A / ←</kbd> 往左走(遇路口)
-              </div>
-              <div className="flex items-center gap-3">
-                <kbd className="bg-slate-900 px-2 py-1 rounded border border-slate-600 font-mono">D / →</kbd> 往右走(遇路口)
-              </div>
-              <div className="flex items-center gap-3">
-                <kbd className="bg-slate-900 px-2 py-1 rounded border border-slate-600 font-mono">Q</kbd> 視角左轉
-              </div>
-              <div className="flex items-center gap-3">
-                <kbd className="bg-slate-900 px-2 py-1 rounded border border-slate-600 font-mono">E</kbd> 視角右轉
-              </div>
-            </div>
-            <p className="mt-4 text-xs text-slate-400">任務：從火車站出發，在街道中實際穿梭，尋找隱藏的中區社區據點！</p>
-          </div>
-
-          <div className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-slate-300 mb-2 flex items-center gap-2">
-                <span className="text-lg">🔑</span>
-                Google Maps API 金鑰
-              </label>
-              <input
-                type="text"
-                value={apiKey}
-                onChange={(e) => setApiKey(e.target.value)}
-                placeholder="輸入您的 API Key (需啟用 Street View API)"
-                className="w-full bg-slate-900 border border-slate-600 rounded-lg px-4 py-3 text-white placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500 transition-all"
-              />
-              {errorMsg && <p className="text-red-400 text-sm mt-2">{errorMsg}</p>}
-              <p className="text-xs text-slate-500 mt-2">
-                *為了載入真實街景圖，必須提供 API Key。此應用程式僅在您的瀏覽器端運行，不會儲存您的金鑰。
-              </p>
-            </div>
-
-            <button
-              onClick={startGame}
-              disabled={loading}
-              className="w-full bg-emerald-600 hover:bg-emerald-500 disabled:bg-slate-600 text-white font-bold py-4 rounded-lg flex items-center justify-center gap-2 transition-colors"
-            >
-              {loading ? '載入實境中...' : (
-                <>
-                  <span className="text-lg">▶️</span>
-                  進入中區街道
-                </>
-              )}
-            </button>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  const visitedCount = spots.filter(s => s.visited).length;
-
-  return (
-    <div className="relative w-full h-screen bg-black overflow-hidden select-none">
-      <div ref={mapContainerRef} className="absolute inset-0 z-0" />
-
-      <div className="absolute top-4 left-4 right-4 z-10 flex justify-between items-start pointer-events-none">
-        <div className="bg-slate-900/80 backdrop-blur-md border border-slate-700/50 p-4 rounded-2xl w-72 pointer-events-auto shadow-2xl max-h-[85vh] overflow-y-auto">
-          <h2 className="text-white font-bold text-lg mb-3 flex items-center gap-2 sticky top-0 bg-slate-900/90 py-1">
-            <span className="text-xl">🗺️</span>
-            中區探索 ({visitedCount}/{spots.length})
-          </h2>
-          <div className="space-y-3">
-            {spots.map((spot) => (
-              <div key={spot.id} className={`flex items-start gap-3 text-sm ${spot.visited ? 'text-white' : 'text-slate-500'}`}>
-                {spot.visited ? (
-                  <span className="shrink-0 mt-0.5 text-emerald-400 text-base leading-none">✅</span>
-                ) : (
-                  <div className="w-[18px] h-[18px] rounded-full border-2 border-slate-600 shrink-0 mt-0.5" />
-                )}
-                <div>
-                  <div className="font-medium">{spot.visited ? spot.name : '??? (未探索)'}</div>
+      if (gameState === 'welcome') {
+        return (
+          <div className="min-h-screen bg-slate-900 text-white flex flex-col items-center justify-center p-4">
+            <div className="max-w-xl w-full bg-slate-800 rounded-2xl p-8 shadow-2xl border border-slate-700">
+              <div className="flex justify-center mb-6">
+                <div className="bg-emerald-500 p-4 rounded-full shadow-lg shadow-emerald-500/30 flex items-center justify-center w-20 h-20">
+                  <span className="text-4xl">🧭</span>
                 </div>
               </div>
-            ))}
-          </div>
-        </div>
-      </div>
+              <h1 className="text-3xl font-bold text-center mb-2">漫步台中中區</h1>
+              <p className="text-slate-400 text-center mb-8">第一人稱社區據點探索實境遊戲</p>
 
-      <div className="absolute bottom-6 left-6 z-10 w-40 h-40 md:w-48 md:h-48 rounded-2xl border-4 border-slate-800 shadow-2xl overflow-hidden bg-slate-800 pointer-events-none">
-        <div ref={minimapContainerRef} className="w-full h-full" />
-      </div>
-
-      <div className="absolute bottom-6 left-0 right-0 z-10 flex flex-col items-center pointer-events-none">
-        <div className="grid grid-cols-3 gap-2 w-48 h-48 bg-slate-900/40 backdrop-blur p-4 rounded-full border border-white/10 pointer-events-auto shadow-2xl">
-          <button onClick={() => turnCamera(-15)} className="bg-white/10 hover:bg-white/20 rounded-xl flex flex-col items-center justify-center active:bg-white/30 transition-colors text-white">
-            <span className="text-xl font-bold leading-none">↺</span>
-            <span className="text-[10px] text-emerald-400 font-mono mt-1 font-bold">Q</span>
-          </button>
-          <button onClick={() => moveDirection(0)} className="bg-white/10 hover:bg-white/20 rounded-xl flex flex-col items-center justify-center active:bg-white/30 transition-colors text-white">
-            <div className="w-0 h-0 border-l-[8px] border-l-transparent border-r-[8px] border-r-transparent border-b-[12px] border-b-white mb-1"></div>
-            <span className="text-[10px] text-emerald-400 font-mono font-bold mt-1">W</span>
-          </button>
-          <button onClick={() => turnCamera(15)} className="bg-white/10 hover:bg-white/20 rounded-xl flex flex-col items-center justify-center active:bg-white/30 transition-colors text-white">
-            <span className="text-xl font-bold leading-none">↻</span>
-            <span className="text-[10px] text-emerald-400 font-mono mt-1 font-bold">E</span>
-          </button>
-          
-          <button onClick={() => moveDirection(-90)} className="bg-white/10 hover:bg-white/20 rounded-xl flex flex-col items-center justify-center active:bg-white/30 transition-colors text-white">
-            <div className="w-0 h-0 border-t-[8px] border-t-transparent border-b-[8px] border-b-transparent border-r-[12px] border-r-white mb-1"></div>
-            <span className="text-[10px] text-emerald-400 font-mono font-bold mt-1">A</span>
-          </button>
-          <div className="flex items-center justify-center opacity-80 text-3xl">
-            🧭
-          </div>
-          <button onClick={() => moveDirection(90)} className="bg-white/10 hover:bg-white/20 rounded-xl flex flex-col items-center justify-center active:bg-white/30 transition-colors text-white">
-            <div className="w-0 h-0 border-t-[8px] border-t-transparent border-b-[8px] border-b-transparent border-l-[12px] border-l-white mb-1"></div>
-            <span className="text-[10px] text-emerald-400 font-mono font-bold mt-1">D</span>
-          </button>
-          
-          <div />
-          <button onClick={() => moveDirection(180)} className="bg-white/10 hover:bg-white/20 rounded-xl flex flex-col items-center justify-center active:bg-white/30 transition-colors text-white">
-            <div className="w-0 h-0 border-l-[8px] border-l-transparent border-r-[8px] border-r-transparent border-t-[12px] border-t-white mb-1"></div>
-            <span className="text-[10px] text-emerald-400 font-mono font-bold mt-1">S</span>
-          </button>
-          <div />
-        </div>
-      </div>
-
-      {showNotification && currentSpot && (
-        <div className="absolute inset-0 z-50 flex items-center justify-center pointer-events-none bg-black/40 backdrop-blur-sm p-4 md:p-8">
-          <div className={`bg-slate-900/95 border-2 border-emerald-500 p-6 sm:p-8 rounded-3xl w-full shadow-[0_0_50px_rgba(16,185,129,0.3)] transform animate-bounce-in pointer-events-auto max-h-[95vh] overflow-y-auto transition-all duration-500 ${quizStep === 'question' ? 'max-w-xl' : 'max-w-5xl'}`}>
-            {quizStep === 'question' ? (
-              <>
-                <div className="flex justify-center mb-4">
-                  <div className="bg-emerald-500/20 p-4 rounded-full flex items-center justify-center w-20 h-20">
-                    <span className="text-4xl">❓</span>
+              <div className="bg-slate-700/50 p-6 rounded-xl mb-8 border border-slate-600">
+                <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                  <span className="text-xl">⌨️</span>
+                  操作方式
+                </h2>
+                <div className="grid grid-cols-2 gap-4 text-sm text-slate-300">
+                  <div className="flex items-center gap-3">
+                    <kbd className="bg-slate-900 px-2 py-1 rounded border border-slate-600 font-mono">W / ↑</kbd> 往前走
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <kbd className="bg-slate-900 px-2 py-1 rounded border border-slate-600 font-mono">S / ↓</kbd> 往後退
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <kbd className="bg-slate-900 px-2 py-1 rounded border border-slate-600 font-mono">A / ←</kbd> 往左走(遇路口)
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <kbd className="bg-slate-900 px-2 py-1 rounded border border-slate-600 font-mono">D / →</kbd> 往右走(遇路口)
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <kbd className="bg-slate-900 px-2 py-1 rounded border border-slate-600 font-mono">Q</kbd> 視角左轉
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <kbd className="bg-slate-900 px-2 py-1 rounded border border-slate-600 font-mono">E</kbd> 視角右轉
                   </div>
                 </div>
-                <h3 className="text-emerald-400 font-bold text-center text-sm tracking-widest mb-1">發現新據點：{currentSpot.name}</h3>
-                <h2 className="text-white text-xl font-bold text-center mb-6 leading-relaxed">{currentSpot.question}</h2>
-                <div className="space-y-3">
-                  {currentSpot.options.map((option, idx) => (
-                    <button
-                      key={idx}
-                      onClick={() => handleAnswer(idx)}
-                      className={`w-full p-4 rounded-xl text-left font-medium transition-all duration-200 ${
-                        wrongAns === idx 
-                          ? 'bg-red-500/20 border-red-500 text-red-200 border animate-pulse' 
-                          : 'bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 hover:border-emerald-500'
-                      }`}
+                <p className="mt-4 text-xs text-slate-400">任務：從火車站出發，在街道中實際穿梭，尋找隱藏的中區社區據點！</p>
+              </div>
+
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-slate-300 mb-2 flex items-center gap-2">
+                    <span className="text-lg">🔑</span>
+                    Google Maps API 金鑰
+                  </label>
+                  <input
+                    type="text"
+                    value={apiKey}
+                    onChange={(e) => setApiKey(e.target.value)}
+                    placeholder="輸入您的 API Key (需啟用 Street View API)"
+                    className="w-full bg-slate-900 border border-slate-600 rounded-lg px-4 py-3 text-white placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500 transition-all"
+                  />
+                  {errorMsg && <p className="text-red-400 text-sm mt-2">{errorMsg}</p>}
+                  <p className="text-xs text-slate-500 mt-2">
+                    *為了載入真實街景圖，必須提供 API Key。此應用程式僅在您的瀏覽器端運行，不會儲存您的金鑰。
+                  </p>
+                </div>
+
+                <button
+                  onClick={startGame}
+                  disabled={loading}
+                  className="w-full bg-emerald-600 hover:bg-emerald-500 disabled:bg-slate-600 text-white font-bold py-4 rounded-lg flex items-center justify-center gap-2 transition-colors"
+                >
+                  {loading ? '載入實境中...' : (
+                    <>
+                      <span className="text-lg">▶️</span>
+                      進入中區街道
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      }
+
+      const visitedCount = spots.filter(s => s.visited).length;
+
+      return (
+        <div className="relative w-full h-screen bg-black overflow-hidden select-none">
+          <div ref={mapContainerRef} className="absolute inset-0 z-0" />
+
+          <div className="absolute top-4 left-4 right-4 z-10 flex justify-between items-start pointer-events-none">
+            <div className="bg-slate-900/80 backdrop-blur-md border border-slate-700/50 p-4 rounded-2xl w-72 pointer-events-auto shadow-2xl max-h-[85vh] overflow-y-auto">
+              <h2 className="text-white font-bold text-lg mb-3 flex items-center gap-2 sticky top-0 bg-slate-900/90 py-1">
+                <span className="text-xl">🗺️</span>
+                中區探索 ({visitedCount}/{spots.length})
+              </h2>
+              <div className="space-y-3">
+                {spots.map((spot) => (
+                  <div key={spot.id} className={`flex items-start gap-3 text-sm ${spot.visited ? 'text-white' : 'text-slate-500'}`}>
+                    {spot.visited ? (
+                      <span className="shrink-0 mt-0.5 text-emerald-400 text-base leading-none">✅</span>
+                    ) : (
+                      <div className="w-[18px] h-[18px] rounded-full border-2 border-slate-600 shrink-0 mt-0.5" />
+                    )}
+                    <div>
+                      <div className="font-medium">{spot.visited ? spot.name : '??? (未探索)'}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          <div className="absolute bottom-6 left-6 z-10 w-40 h-40 md:w-48 md:h-48 rounded-2xl border-4 border-slate-800 shadow-2xl overflow-hidden bg-slate-800 pointer-events-none">
+            <div ref={minimapContainerRef} className="w-full h-full" />
+          </div>
+
+          <div className="absolute bottom-6 left-0 right-0 z-10 flex flex-col items-center pointer-events-none">
+            <div className="grid grid-cols-3 gap-2 w-48 h-48 bg-slate-900/40 backdrop-blur p-4 rounded-full border border-white/10 pointer-events-auto shadow-2xl">
+              <button onClick={() => turnCamera(-15)} className="bg-white/10 hover:bg-white/20 rounded-xl flex flex-col items-center justify-center active:bg-white/30 transition-colors text-white">
+                <span className="text-xl font-bold leading-none">↺</span>
+                <span className="text-[10px] text-emerald-400 font-mono mt-1 font-bold">Q</span>
+              </button>
+              <button onClick={() => moveDirection(0)} className="bg-white/10 hover:bg-white/20 rounded-xl flex flex-col items-center justify-center active:bg-white/30 transition-colors text-white">
+                <div className="w-0 h-0 border-l-[8px] border-l-transparent border-r-[8px] border-r-transparent border-b-[12px] border-b-white mb-1"></div>
+                <span className="text-[10px] text-emerald-400 font-mono font-bold mt-1">W</span>
+              </button>
+              <button onClick={() => turnCamera(15)} className="bg-white/10 hover:bg-white/20 rounded-xl flex flex-col items-center justify-center active:bg-white/30 transition-colors text-white">
+                <span className="text-xl font-bold leading-none">↻</span>
+                <span className="text-[10px] text-emerald-400 font-mono mt-1 font-bold">E</span>
+              </button>
+              
+              <button onClick={() => moveDirection(-90)} className="bg-white/10 hover:bg-white/20 rounded-xl flex flex-col items-center justify-center active:bg-white/30 transition-colors text-white">
+                <div className="w-0 h-0 border-t-[8px] border-t-transparent border-b-[8px] border-b-transparent border-r-[12px] border-r-white mb-1"></div>
+                <span className="text-[10px] text-emerald-400 font-mono font-bold mt-1">A</span>
+              </button>
+              <div className="flex items-center justify-center opacity-80 text-3xl">
+                🧭
+              </div>
+              <button onClick={() => moveDirection(90)} className="bg-white/10 hover:bg-white/20 rounded-xl flex flex-col items-center justify-center active:bg-white/30 transition-colors text-white">
+                <div className="w-0 h-0 border-t-[8px] border-t-transparent border-b-[8px] border-b-transparent border-l-[12px] border-l-white mb-1"></div>
+                <span className="text-[10px] text-emerald-400 font-mono font-bold mt-1">D</span>
+              </button>
+              
+              <div />
+              <button onClick={() => moveDirection(180)} className="bg-white/10 hover:bg-white/20 rounded-xl flex flex-col items-center justify-center active:bg-white/30 transition-colors text-white">
+                <div className="w-0 h-0 border-l-[8px] border-l-transparent border-r-[8px] border-r-transparent border-t-[12px] border-t-white mb-1"></div>
+                <span className="text-[10px] text-emerald-400 font-mono font-bold mt-1">S</span>
+              </button>
+              <div />
+            </div>
+          </div>
+
+          {showNotification && currentSpot && (
+            <div className="absolute inset-0 z-50 flex items-center justify-center pointer-events-none bg-black/40 backdrop-blur-sm p-4 md:p-8">
+              <div className={`bg-slate-900/95 border-2 border-emerald-500 p-6 sm:p-8 rounded-3xl w-full shadow-[0_0_50px_rgba(16,185,129,0.3)] transform animate-bounce-in pointer-events-auto max-h-[95vh] overflow-y-auto transition-all duration-500 ${quizStep === 'question' ? 'max-w-xl' : 'max-w-5xl'}`}>
+                {quizStep === 'question' ? (
+                  <>
+                    <div className="flex justify-center mb-4">
+                      <div className="bg-emerald-500/20 p-4 rounded-full flex items-center justify-center w-20 h-20">
+                        <span className="text-4xl">❓</span>
+                      </div>
+                    </div>
+                    <h3 className="text-emerald-400 font-bold text-center text-sm tracking-widest mb-1">發現新據點：{currentSpot.name}</h3>
+                    <h2 className="text-white text-xl font-bold text-center mb-6 leading-relaxed">{currentSpot.question}</h2>
+                    <div className="space-y-3">
+                      {currentSpot.options.map((option, idx) => (
+                        <button
+                          key={idx}
+                          onClick={() => handleAnswer(idx)}
+                          className={`w-full p-4 rounded-xl text-left font-medium transition-all duration-200 ${
+                            wrongAns === idx 
+                              ? 'bg-red-500/20 border-red-500 text-red-200 border animate-pulse' 
+                              : 'bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 hover:border-emerald-500'
+                          }`}
+                        >
+                          <span className="mr-3 text-emerald-500 font-bold">{['A', 'B', 'C', 'D'][idx]}</span>
+                          {option}
+                        </button>
+                      ))}
+                    </div>
+                    {wrongAns !== null && (
+                      <p className="text-red-400 text-center text-sm mt-4 animate-bounce">哎呀，答錯囉！再試一次看看～</p>
+                    )}
+                  </>
+                ) : (
+                  <>
+                    <div className="flex justify-center mb-4">
+                      <div className="bg-emerald-500/20 p-4 rounded-full flex items-center justify-center w-20 h-20">
+                        <span className="text-4xl">🎉</span>
+                      </div>
+                    </div>
+                    <h3 className="text-emerald-400 font-bold text-center text-sm tracking-widest mb-1">恭喜答對！</h3>
+                    <h2 className="text-white text-3xl font-bold text-center mb-6">{currentSpot.name}</h2>
+                    
+                    <div className="flex flex-col md:flex-row gap-4 sm:gap-6 mb-6">
+                      <div className="flex-1 flex flex-col items-center w-full">
+                        <span className="text-slate-400 text-xs sm:text-sm font-bold mb-2 tracking-widest">【昔日】</span>
+                        <img src={currentSpot.pastImg} alt={`${currentSpot.name}昔日`} className="w-full h-64 sm:h-80 lg:h-[400px] object-cover rounded-xl border-2 border-slate-600 shadow-inner" />
+                      </div>
+                      <div className="flex-1 flex flex-col items-center w-full">
+                        <span className="text-emerald-400 text-xs sm:text-sm font-bold mb-2 tracking-widest">【今日】</span>
+                        <img src={currentSpot.presentImg} alt={`${currentSpot.name}今日`} className="w-full h-64 sm:h-80 lg:h-[400px] object-cover rounded-xl border-2 border-emerald-500 shadow-[0_0_15px_rgba(16,185,129,0.2)]" />
+                      </div>
+                    </div>
+
+                    <div className="bg-slate-800 rounded-xl p-5 text-slate-300 text-sm sm:text-base leading-relaxed flex gap-3">
+                      <span className="shrink-0 mt-0.5 text-lg leading-none">ℹ️</span>
+                      <p>{currentSpot.description}</p>
+                    </div>
+                    <button 
+                      onClick={() => {
+                        setShowNotification(false);
+                        if (spots.every(s => s.visited)) {
+                          setGameState('finished');
+                        }
+                      }}
+                      className="mt-6 w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-3 rounded-xl transition-colors text-lg"
                     >
-                      <span className="mr-3 text-emerald-500 font-bold">{['A', 'B', 'C', 'D'][idx]}</span>
-                      {option}
+                      {spots.every(s => s.visited) ? '🎉 完成所有探索！' : '繼續探索'}
                     </button>
+                  </>
+                )}
+              </div>
+            </div>
+          )}
+
+          {gameState === 'finished' && (
+            <div className="absolute inset-0 z-[60] flex items-center justify-center bg-slate-900/90 backdrop-blur-md p-4 sm:p-8 overflow-y-auto">
+              <div className="max-w-5xl w-full bg-slate-800 border-4 border-amber-400 p-8 sm:p-12 rounded-3xl shadow-[0_0_100px_rgba(251,191,36,0.4)] transform animate-bounce-in flex flex-col items-center my-auto">
+                <div className="text-7xl sm:text-8xl mb-6 animate-pulse">🏆</div>
+                <h1 className="text-4xl md:text-5xl font-bold text-amber-400 mb-4 text-center tracking-wide">尋寶大作戰 大成功！</h1>
+                <p className="text-slate-300 text-lg sm:text-xl mb-10 text-center leading-relaxed">
+                  太棒了！您已經找齊了台中中區的 <span className="text-emerald-400 font-bold text-3xl mx-2">9</span> 個隱藏歷史據點，<br className="hidden sm:block"/>
+                  完成這趟深度的時光漫步之旅！
+                </p>
+                
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4 w-full mb-10">
+                  {spots.map(spot => (
+                    <div key={spot.id} className="bg-slate-900 rounded-xl overflow-hidden border-2 border-emerald-500/50 flex flex-col items-center relative group">
+                      <div className="absolute top-2 right-2 z-10 bg-emerald-500 text-white text-[10px] sm:text-xs font-bold px-2 py-1 rounded-full shadow">
+                        達成
+                      </div>
+                      <img src={spot.presentImg} alt={spot.name} className="w-full h-24 sm:h-28 object-cover opacity-80 group-hover:opacity-100 transition-opacity" />
+                      <div className="p-3 w-full text-center text-sm sm:text-base font-bold text-emerald-400 truncate">
+                        {spot.name}
+                      </div>
+                    </div>
                   ))}
                 </div>
-                {wrongAns !== null && (
-                  <p className="text-red-400 text-center text-sm mt-4 animate-bounce">哎呀，答錯囉！再試一次看看～</p>
-                )}
-              </>
-            ) : (
-              <>
-                <div className="flex justify-center mb-4">
-                  <div className="bg-emerald-500/20 p-4 rounded-full flex items-center justify-center w-20 h-20">
-                    <span className="text-4xl">🎉</span>
-                  </div>
-                </div>
-                <h3 className="text-emerald-400 font-bold text-center text-sm tracking-widest mb-1">恭喜答對！</h3>
-                <h2 className="text-white text-3xl font-bold text-center mb-6">{currentSpot.name}</h2>
-                
-                <div className="flex flex-col md:flex-row gap-4 sm:gap-6 mb-6">
-                  <div className="flex-1 flex flex-col items-center w-full">
-                    <span className="text-slate-400 text-xs sm:text-sm font-bold mb-2 tracking-widest">【昔日】</span>
-                    <img src={currentSpot.pastImg} alt={`${currentSpot.name}昔日`} className="w-full h-64 sm:h-80 lg:h-[400px] object-cover rounded-xl border-2 border-slate-600 shadow-inner" />
-                  </div>
-                  <div className="flex-1 flex flex-col items-center w-full">
-                    <span className="text-emerald-400 text-xs sm:text-sm font-bold mb-2 tracking-widest">【今日】</span>
-                    <img src={currentSpot.presentImg} alt={`${currentSpot.name}今日`} className="w-full h-64 sm:h-80 lg:h-[400px] object-cover rounded-xl border-2 border-emerald-500 shadow-[0_0_15px_rgba(16,185,129,0.2)]" />
-                  </div>
-                </div>
 
-                <div className="bg-slate-800 rounded-xl p-5 text-slate-300 text-sm sm:text-base leading-relaxed flex gap-3">
-                  <span className="shrink-0 mt-0.5 text-lg leading-none">ℹ️</span>
-                  <p>{currentSpot.description}</p>
-                </div>
                 <button 
-                  onClick={() => {
-                    setShowNotification(false);
-                    if (spots.every(s => s.visited)) {
-                      setGameState('finished');
-                    }
-                  }}
-                  className="mt-6 w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-3 rounded-xl transition-colors text-lg"
+                  onClick={() => window.location.reload()}
+                  className="bg-amber-500 hover:bg-amber-400 text-slate-900 font-bold py-4 px-12 rounded-full text-xl transition-transform hover:scale-105 shadow-xl"
                 >
-                  {spots.every(s => s.visited) ? '🎉 完成所有探索！' : '繼續探索'}
+                  再玩一次
                 </button>
-              </>
-            )}
-          </div>
-        </div>
-      )}
-
-      {gameState === 'finished' && (
-        <div className="absolute inset-0 z-[60] flex items-center justify-center bg-slate-900/90 backdrop-blur-md p-4 sm:p-8 overflow-y-auto">
-          <div className="max-w-5xl w-full bg-slate-800 border-4 border-amber-400 p-8 sm:p-12 rounded-3xl shadow-[0_0_100px_rgba(251,191,36,0.4)] transform animate-bounce-in flex flex-col items-center my-auto">
-            <div className="text-7xl sm:text-8xl mb-6 animate-pulse">🏆</div>
-            <h1 className="text-4xl md:text-5xl font-bold text-amber-400 mb-4 text-center tracking-wide">尋寶大作戰 大成功！</h1>
-            <p className="text-slate-300 text-lg sm:text-xl mb-10 text-center leading-relaxed">
-              太棒了！您已經找齊了台中中區的 <span className="text-emerald-400 font-bold text-3xl mx-2">9</span> 個隱藏歷史據點，<br className="hidden sm:block"/>
-              完成這趟深度的時光漫步之旅！
-            </p>
-            
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4 w-full mb-10">
-              {spots.map(spot => (
-                <div key={spot.id} className="bg-slate-900 rounded-xl overflow-hidden border-2 border-emerald-500/50 flex flex-col items-center relative group">
-                  <div className="absolute top-2 right-2 z-10 bg-emerald-500 text-white text-[10px] sm:text-xs font-bold px-2 py-1 rounded-full shadow">
-                    達成
-                  </div>
-                  <img src={spot.presentImg} alt={spot.name} className="w-full h-24 sm:h-28 object-cover opacity-80 group-hover:opacity-100 transition-opacity" />
-                  <div className="p-3 w-full text-center text-sm sm:text-base font-bold text-emerald-400 truncate">
-                    {spot.name}
-                  </div>
-                </div>
-              ))}
+              </div>
             </div>
+          )}
 
-            <button 
-              onClick={() => window.location.reload()}
-              className="bg-amber-500 hover:bg-amber-400 text-slate-900 font-bold py-4 px-12 rounded-full text-xl transition-transform hover:scale-105 shadow-xl"
-            >
-              再玩一次
-            </button>
-          </div>
+          <style dangerouslySetInnerHTML={{__html: `
+            @keyframes bounce-in {
+              0% { transform: scale(0.8); opacity: 0; }
+              50% { transform: scale(1.05); opacity: 1; }
+              100% { transform: scale(1); opacity: 1; }
+            }
+            .animate-bounce-in {
+              animation: bounce-in 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+            }
+          `}} />
         </div>
-      )}
+      );
+    }
 
-      <style dangerouslySetInnerHTML={{__html: `
-        @keyframes bounce-in {
-          0% { transform: scale(0.8); opacity: 0; }
-          50% { transform: scale(1.05); opacity: 1; }
-          100% { transform: scale(1); opacity: 1; }
-        }
-        .animate-bounce-in {
-          animation: bounce-in 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
-        }
-      `}} />
-    </div>
-  );
-}
+    // 將 React 元件渲染到 DOM 中
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<App />);
+  </script>
+</body>
+</html>
