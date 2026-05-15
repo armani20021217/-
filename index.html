@@ -1,462 +1,687 @@
-<!DOCTYPE html>
-<html lang="zh-Hant">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>經典老藝人賓果 Pro - 職能治療師專業版</title>
-    <!-- Tailwind CSS -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    <!-- PDF 產生核心庫 -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-    <style>
-        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700;900&display=swap');
-        
-        :root {
-            --primary: #1e293b;
-            --accent: #4f46e5;
-            --bingo-gold: #b45309;
-        }
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 
-        body {
-            font-family: 'Noto Sans TC', sans-serif;
-            background-color: #f1f5f9;
-            color: var(--primary);
-            -webkit-tap-highlight-color: transparent;
-        }
+// 台中中區的社區據點資料 (經緯度與介紹)
+const COMMUNITY_SPOTS = [
+  {
+    id: 'station',
+    name: '台中舊火車站',
+    lat: 24.137494, 
+    lng: 120.684804,
+    description: '建於日治時期的紅磚建築，是台中市的地標，也是我們這趟中區探索之旅的起點！',
+    question: '請問台中舊火車站的主要建築風格是被稱為什麼式？',
+    options: ['巴洛克式', '文藝復興式 (辰野金吾風格)', '哥德式', '現代主義'],
+    correct: 1,
+    visited: false,
+    pastImg: 'https://upload.wikimedia.org/wikipedia/commons/1/1b/%E5%A7%8B%E5%BB%BA%E6%96%BC1905%E5%B9%B4%E7%9A%84%E8%87%BA%E7%81%A3%E8%87%BA%E4%B8%AD%E9%A9%9B_%28%E7%81%AB%E8%BB%8A%E7%AB%99%29_Taichung_Train_Station_of_Taiwan.jpg',
+    presentImg: 'https://i0.wp.com/journey.tw/wp-content/uploads/20181008001502_36.jpg?resize=1100%2C734&quality=99&ssl=1'
+  },
+  {
+    id: 'miyahara',
+    name: '宮原眼科',
+    lat: 24.13783,
+    lng: 120.68345,
+    description: '早期由日本眼科博士宮原武熊所開的眼科醫院，如今由日出集團改建，成為販售冰淇淋與糕點的知名打卡據點。',
+    question: '宮原眼科在日治時期，原本是看哪一科的診所？',
+    options: ['牙科', '眼科', '內科', '外科'],
+    correct: 1,
+    visited: false,
+    pastImg: 'https://dcm.s3.hicloud.net.tw/new/collection/2021-04-01/3452dd47-ab8a-4e8f-aab9-5acee7878c04/ed508781-77cf-44d6-b9e4-463e7ab01b42.jpg',
+    presentImg: 'https://margaret.tw/wp-content/uploads/2020/11/nEO_IMG_DSC09631.jpg'
+  },
+  {
+    id: 'asean',
+    name: '東協廣場',
+    lat: 24.1390538,
+    lng: 120.6841090,
+    description: '中區重要的移工與新住民生活圈，被稱為台中的「小東南亞」，充滿豐富的異國美食與文化能量。',
+    question: '東協廣場早期被老台中人稱為什麼？',
+    options: ['第一廣場', '第二廣場', '東南亞廣場', '移工廣場'],
+    correct: 0,
+    visited: false,
+    pastImg: 'https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEhvy3mmjT2LSyJXHr64zgltT00DsMWMnB0Q7ZA0z7nplz1MKX_UN28bn5ndsyXMxrBkWpBfs1DUe5Q3m4_T-jBv1bCIZVfvtHoq_77pLWnBuHbLEJtnNrOotOCAfreO2s6jH29GHfJsUqY/s640/img081.jpg',
+    presentImg: 'https://travel.taichung.gov.tw/instagram-src/coubzyyv02s'
+  },
+  {
+    id: 'second_market',
+    name: '第二市場',
+    lat: 24.14238,
+    lng: 120.67954,
+    description: '超過百年歷史的傳統市場，呈六角形放射狀建築，裡面藏著魯肉飯、紅茶、菜頭粿等無數在地老饕推薦的美食。',
+    question: '走進第二市場，您會發現它的內部建築動線呈現什麼形狀？',
+    options: ['正方形', '圓形', '六角形放射狀', '三角形'],
+    correct: 2,
+    visited: false,
+    pastImg: 'https://dcm.s3.hicloud.net.tw/new/collection/2021-04-01/b76efda9-90b1-4a5f-8199-ceea9b62186f/513ac3f1-e1f6-45ab-aa37-1c04853f01a5.jpg',
+    presentImg: 'https://imgcdn.cna.com.tw/www/WebPhotos/1024/20230122/1024x768_20230122000092.jpg'
+  },
+  {
+    id: 'liuchuan',
+    name: '柳川水岸步道',
+    lat: 24.1424392,
+    lng: 120.6772764,
+    description: '經過整治後的城市河川，夜晚點燈後非常美麗，是中區居民散步休憩的重要公共空間。',
+    question: '柳川與哪一條河川並列為台中市區的兩大重要河川？',
+    options: ['梅川', '綠川', '旱溪', '大甲溪'],
+    correct: 1,
+    visited: false,
+    pastImg: 'https://curation.culture.tw/api/pic?id=User0a665a46e-92e4-4653-b2d0-782e933b6b61&w=500',
+    presentImg: 'https://travel.taichung.gov.tw/image/50510/1024x768'
+  },
+  {
+    id: 'prefectural_hall',
+    name: '台中州廳',
+    lat: 24.1388953,
+    lng: 120.6787289,
+    description: '台中州廳在日治時期是重要的行政中心，建築華麗且充滿歷史感，與台北市政府舊廈風格相近。',
+    question: '台中州廳是哪一位知名建築師設計的？',
+    options: ['森山松之助', '辰野金吾', '伊東豊雄', '安藤忠雄'],
+    correct: 0,
+    visited: false,
+    pastImg: 'https://www.tonyhuang39.com/tony0608/20080716_15.JPG',
+    presentImg: 'https://www.taichung.gov.tw/media/468752/%E5%8F%B0%E4%B8%AD%E5%B7%9E%E5%BB%B3.jpg'
+  },
+  {
+    id: 'sun_cake',
+    name: '太陽餅博物館 (全安堂)',
+    lat: 24.1398104,
+    lng: 120.6825295,
+    description: '這棟百年紅磚建築早年是藥局，現在則用來傳承台中太陽餅的歷史與手作技藝。',
+    question: '台中名產「太陽餅」早期被稱為什麼？',
+    options: ['老婆餅', '麥芽餅', '月亮餅', '椪餅'],
+    correct: 1,
+    visited: false,
+    pastImg: 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQ8jtrVxGMzPnXy2XMNAB6j2Buw18V5ciKJ4g&s',
+    presentImg: 'https://taichung.travel/content/images/attractions/50376/1024x768_image637711207007468998.jpg'
+  },
+  {
+    id: 'wanchun',
+    name: '萬春宮 (台中媽)',
+    lat: 24.141777,
+    lng: 120.681765,
+    description: '這座兩百多年歷史的廟宇，不僅是中區信仰中心，廟內的古蹟文物更見證了台中市的發展。',
+    question: '萬春宮主要供奉的神明是哪一尊？',
+    options: ['觀世音菩薩', '天上聖母 (媽祖)', '關聖帝君', '土地公'],
+    correct: 1,
+    visited: false,
+    pastImg: 'https://www.lswc.org.tw/tw/style/relic/default/images/img_003.png',
+    presentImg: 'https://upload.wikimedia.org/wikipedia/commons/8/8a/%E5%8F%B0%E4%B8%AD%E8%90%AC%E6%98%A5%E5%AE%AE.jpg'
+  },
+  {
+    id: 'taichung_park',
+    name: '台中公園',
+    lat: 24.1436036,
+    lng: 120.682837,
+    description: '台中市歷史最悠久的公園，園內的「湖心亭」是台中市的象徵地標，承載了無數台中人的美好回憶。',
+    question: '台中公園內最著名的地標，建造於日月湖上的雙拼式涼亭稱為什麼？',
+    options: ['湖心亭', '望月亭', '思源亭', '觀水亭'],
+    correct: 0,
+    visited: false,
+    pastImg: 'https://tcmbdata.culture.tw/api/collection/image/Culture_Place?uid=612816',
+    presentImg: 'https://travel.taichung.gov.tw/instagram-src/cvllcyjjx3z'
+  }
+];
 
-        /* 賓果卡樣式 */
-        .bingo-card {
-            background: white;
-            width: 100%;
-            max-width: 210mm;
-            min-height: 297mm;
-            padding: 15mm;
-            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.1);
-            display: flex;
-            flex-direction: column;
-            box-sizing: border-box;
-            margin: 0 auto;
-            position: relative;
-        }
+// 計算兩個經緯度之間的距離 (單位: 公尺)
+const calculateDistance = (lat1, lon1, lat2, lon2) => {
+  const R = 6371e3; // 地球半徑 (公尺)
+  const φ1 = lat1 * Math.PI / 180;
+  const φ2 = lat2 * Math.PI / 180;
+  const Δφ = (lat2 - lat1) * Math.PI / 180;
+  const Δλ = (lon2 - lon1) * Math.PI / 180;
 
-        /* 下載專用的標準 A4 尺寸 */
-        .download-standard {
-            width: 794px !important;
-            height: 1123px !important;
-            padding: 45px !important;
-            position: fixed !important;
-            left: -9999px !important;
-            top: 0 !important;
-            box-shadow: none !important;
-        }
+  const a = Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
+    Math.cos(φ1) * Math.cos(φ2) *
+    Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 
-        /* 標記樣式 (紅色印章感) */
-        .marked { 
-            background-color: #fef2f2 !important; 
-            position: relative; 
-        }
-        .marked::after {
-            content: '已抽';
-            position: absolute;
-            font-size: 1.2rem;
-            color: #ef4444;
-            border: 3px solid #ef4444;
-            padding: 2px 6px;
-            border-radius: 4px;
-            text-transform: uppercase;
-            font-weight: 900;
-            transform: rotate(-15deg);
-            opacity: 0.6;
-            z-index: 5;
-        }
+  return R * c; 
+};
 
-        /* 賓果格線 */
-        .bingo-grid {
-            display: grid;
-            grid-template-columns: repeat(4, 1fr);
-            grid-template-rows: repeat(4, 1fr);
-            border: 5px solid var(--primary);
-            flex-grow: 1;
-            width: 100%;
-        }
-        .bingo-cell {
-            border: 2px solid var(--primary);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            text-align: center;
-            font-size: clamp(1.4rem, 4vw, 2.8rem);
-            font-weight: 900;
-            padding: 10px;
-            background: white;
-            line-height: 1.1;
-            cursor: pointer;
-            transition: all 0.2s;
-        }
-        .bingo-cell:hover { background-color: #f8fafc; }
+export default function App() {
+  const [apiKey, setApiKey] = useState('');
+  const [gameState, setGameState] = useState('welcome'); // 'welcome', 'playing', 'finished'
+  const [spots, setSpots] = useState(COMMUNITY_SPOTS);
+  const [currentSpot, setCurrentSpot] = useState(null); 
+  const [showNotification, setShowNotification] = useState(false);
+  const [quizStep, setQuizStep] = useState('question'); 
+  const [wrongAns, setWrongAns] = useState(null); 
+  const [loading, setLoading] = useState(false);
+  const [errorMsg, setErrorMsg] = useState('');
+  
+  const panoramaRef = useRef(null);
+  const mapContainerRef = useRef(null);
+  const minimapContainerRef = useRef(null); 
+  const minimapRef = useRef(null); 
+  const playerMarkerRef = useRef(null); 
+  const initialLoadRef = useRef(true); 
 
-        @keyframes roll {
-            0% { transform: translateY(0); opacity: 0.5; }
-            50% { transform: translateY(-10px); opacity: 1; }
-            100% { transform: translateY(0); opacity: 0.5; }
-        }
-        .animate-roll { animation: roll 0.1s infinite; }
+  // 載入 Google Maps 腳本
+  const loadGoogleMapsScript = (key) => {
+    return new Promise((resolve, reject) => {
+      if (window.google && window.google.maps) {
+        resolve();
+        return;
+      }
+      const script = document.createElement('script');
+      script.src = `https://maps.googleapis.com/maps/api/js?key=${key}&libraries=geometry`;
+      script.async = true;
+      script.defer = true;
+      script.onload = resolve;
+      script.onerror = () => reject(new Error('Google Maps API 載入失敗，請檢查金鑰是否正確。'));
+      document.body.appendChild(script);
+    });
+  };
 
-        @media print {
-            @page { size: A4 portrait; margin: 0; }
-            .no-print { display: none !important; }
-            body { background: white !important; }
-            #printArea { padding: 0 !important; }
-            .bingo-card {
-                box-shadow: none !important;
-                page-break-after: always;
-            }
-        }
+  const startGame = async () => {
+    if (!apiKey) {
+      setErrorMsg('請輸入您的 API Key');
+      return;
+    }
+    setLoading(true);
+    setErrorMsg('');
+    try {
+      await loadGoogleMapsScript(apiKey);
+      setGameState('playing');
+    } catch (err) {
+      setErrorMsg(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
 
-        /* 隱藏捲軸但保持功能 */
-        .no-scrollbar::-webkit-scrollbar { display: none; }
-        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
-    </style>
-</head>
-<body class="bg-slate-100 min-h-screen">
+  // 初始化街景與小地圖
+  useEffect(() => {
+    if (gameState === 'playing' && mapContainerRef.current && minimapContainerRef.current) {
+      const startSpot = spots.find(s => s.id === 'station');
+      const svService = new window.google.maps.StreetViewService();
 
-    <!-- 加載遮罩 -->
-    <div id="loadingOverlay" class="fixed inset-0 z-[100] flex flex-col items-center justify-center bg-slate-900/90 text-white hidden">
-        <div class="w-16 h-16 border-4 border-indigo-400 border-t-transparent rounded-full animate-spin mb-4"></div>
-        <p class="text-xl font-bold" id="progressText">準備 PDF 中...</p>
-    </div>
+      svService.getPanorama(
+        {
+          location: { lat: startSpot.lat, lng: startSpot.lng },
+          radius: 50,
+          source: window.google.maps.StreetViewSource.OUTDOOR
+        },
+        (data, status) => {
+          if (status === window.google.maps.StreetViewStatus.OK) {
+            const panorama = new window.google.maps.StreetViewPanorama(
+              mapContainerRef.current,
+              {
+                pano: data.location.pano,
+                pov: { heading: 135, pitch: 0 },
+                zoom: 1,
+                addressControl: false, 
+                showRoadLabels: true,
+                linksControl: true,    
+                panControl: false,
+                enableCloseButton: false,
+                fullscreenControl: false,
+                zoomControl: false,
+                clickToGo: true,       
+                disableDoubleClickZoom: true,
+              }
+            );
+            panoramaRef.current = panorama;
 
-    <div class="no-print max-w-6xl mx-auto p-4 md:p-8">
-        <!-- 標題區 -->
-        <header class="flex flex-col md:flex-row justify-between items-center mb-8 gap-4">
-            <div class="text-center md:text-left">
-                <h1 class="text-4xl md:text-5xl font-black text-slate-800 flex items-center gap-3">
-                    <span class="text-indigo-600">📽️</span> 經典藝人賓果
-                </h1>
-                <p class="text-slate-500 font-medium mt-1">黃金年代回憶之旅 ‧ 專業長輩活動設計版</p>
-            </div>
-            <div class="flex gap-2">
-                <button onclick="toggleSound()" id="soundBtn" class="bg-white p-4 rounded-2xl shadow-sm border border-slate-200 hover:bg-slate-50 transition">
-                    <span id="soundIcon" class="text-2xl">🔊</span>
-                </button>
-                <div class="bg-white px-6 py-4 rounded-2xl shadow-sm border border-slate-200">
-                    <span class="text-sm font-bold text-slate-400 block uppercase">名單數量</span>
-                    <span id="count" class="text-2xl font-black text-indigo-600">0</span>
-                </div>
-            </div>
-        </header>
-
-        <div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
-            <!-- 左側：控制盤 -->
-            <div class="lg:col-span-4 space-y-6">
-                <!-- 抽籤面板 -->
-                <div class="bg-slate-900 rounded-[2.5rem] p-8 text-center shadow-2xl relative overflow-hidden">
-                    <div class="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-indigo-500 to-transparent opacity-50"></div>
-                    <div id="drawDisplay" class="text-5xl md:text-6xl font-black text-white min-h-[120px] flex items-center justify-center tracking-tight leading-tight">
-                        準備開始
-                    </div>
-                    <button id="drawBtn" onclick="startDraw()" class="w-full bg-indigo-600 text-white py-5 rounded-2xl font-black text-2xl hover:bg-indigo-500 shadow-lg shadow-indigo-900/20 active:scale-95 transition mt-4">
-                        啟動抽籤
-                    </button>
-                    <div class="flex gap-2 mt-4">
-                        <button onclick="resetDraw()" class="flex-1 py-3 bg-slate-800 text-slate-400 rounded-xl font-bold hover:text-white transition text-sm">清除紀錄</button>
-                        <button onclick="speakCurrent()" id="speakBtn" class="flex-1 py-3 bg-slate-800 text-slate-400 rounded-xl font-bold hover:text-white transition text-sm hidden">🔊 朗讀姓名</button>
-                    </div>
-                </div>
-
-                <!-- 名單管理 -->
-                <div class="bg-white p-6 rounded-[2rem] shadow-sm border border-slate-200">
-                    <h2 class="text-xl font-black mb-4 flex items-center text-slate-700">
-                        🖊️ 快速編輯名單
-                    </h2>
-                    <div class="flex gap-2 mb-4">
-                        <input type="text" id="newArtist" placeholder="輸入姓名..." class="flex-1 border-2 border-slate-100 p-3 rounded-xl focus:border-indigo-500 outline-none font-bold">
-                        <button onclick="addArtist()" class="bg-slate-800 text-white px-4 py-3 rounded-xl font-bold hover:bg-black transition">新增</button>
-                    </div>
-                    <div id="artistList" class="flex flex-wrap gap-2 max-h-48 overflow-y-auto no-scrollbar p-1"></div>
-                </div>
-            </div>
-
-            <!-- 右側：歷史與功能 -->
-            <div class="lg:col-span-8 space-y-6">
-                <!-- 已抽出 -->
-                <div class="bg-white p-8 rounded-[2rem] shadow-sm border border-slate-200">
-                    <h2 class="text-xl font-black mb-4 text-slate-400 uppercase tracking-widest">已抽出紀錄</h2>
-                    <div id="historyList" class="flex flex-wrap gap-3 min-h-[60px]">
-                        <p class="text-slate-300 font-medium italic">尚未開始抽籤...</p>
-                    </div>
-                </div>
-
-                <!-- 下載與生成 -->
-                <div class="bg-indigo-50 p-8 rounded-[2.5rem] border-2 border-indigo-100">
-                    <h2 class="text-2xl font-black mb-6 text-indigo-900">🖨️ 製作賓果紙卡</h2>
-                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 items-end">
-                        <div class="space-y-2">
-                            <label class="font-black text-indigo-700 text-sm ml-1">產出張數 (1-50)</label>
-                            <input type="number" id="cardCount" value="5" min="1" max="50" class="w-full bg-white border-2 border-indigo-200 p-4 rounded-2xl text-center font-black text-2xl text-indigo-600">
-                        </div>
-                        <button onclick="generateCards()" class="bg-indigo-600 text-white py-5 rounded-2xl font-black text-lg hover:bg-indigo-700 transition shadow-md">1. 生成預覽</button>
-                        <button onclick="window.print()" class="bg-slate-800 text-white py-5 rounded-2xl font-black hover:bg-black transition text-lg shadow-md">2. 列印 A4</button>
-                        <button onclick="downloadPDF()" class="bg-blue-600 text-white py-5 rounded-2xl font-black hover:bg-blue-700 transition text-lg shadow-xl active:scale-95">3. 下載 PDF</button>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- 預覽區域 -->
-    <div id="printArea" class="py-10 space-y-12"></div>
-
-    <!-- 藝人詳情彈窗 -->
-    <div id="artistModal" class="no-print fixed inset-0 z-50 flex items-center justify-center bg-slate-900/95 backdrop-blur-sm hidden p-4">
-        <div class="bg-white rounded-[3rem] max-w-lg w-full overflow-hidden shadow-2xl animate-in fade-in zoom-in duration-300">
-            <div id="modalHeader" class="h-24 bg-indigo-600 flex flex-col items-center justify-center text-white p-4">
-                <h2 id="modalTitle" class="text-4xl font-black">藝人姓名</h2>
-            </div>
-            <div class="p-8">
-                <div id="modalContentFacts">
-                    <div id="modalFacts" class="space-y-4 text-slate-700 text-xl font-bold leading-relaxed mb-6"></div>
-                </div>
-                <div id="modalContentPhoto" class="hidden mb-6">
-                    <img id="modalImg" src="" alt="照片" class="w-full h-64 object-cover rounded-2xl shadow-inner bg-slate-100">
-                </div>
-                <div class="grid grid-cols-2 gap-3">
-                    <button id="photoBtn" onclick="togglePhotoView()" class="bg-indigo-50 text-indigo-600 py-4 rounded-2xl font-black text-lg">📸 經典照片</button>
-                    <button onclick="closeModal()" class="bg-slate-900 text-white py-4 rounded-2xl font-black text-lg hover:bg-black">關閉視窗</button>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- 輔助下載用 -->
-    <div id="download-clone-box" class="hidden"></div>
-
-    <script>
-        const artistDatabase = {
-            "鄧麗君": { facts: ["亞洲歌姬，首位將華語流行音樂推向全亞洲與日本的歌手", "經典名曲《月亮代表我的心》傳唱至今"], icon: "🌸", img: "https://cdn.ftvnews.com.tw/manasystem/FileData/News/391deb74-45bd-4830-ae31-a72f49e3efd0.jpg" },
-            "鳳飛飛": { facts: ["帽子歌后，以親民形象橫跨歌壇與主持界", "代表作《掌聲響起》是勵志經典"], icon: "👒", img: "https://g.udn.com.tw/community/img/PSN_ARTICLE/maytsai0522/f_6140371_1.jpg" },
-            "劉文正": { facts: ["白馬王子，華語樂壇偶像始祖，開創動感潮流的巨星", "代表作《三月裡的小雨》引發轟動"], icon: "🧣", img: "https://cdn2.ettoday.net/images/6856/e6856008.jpg" },
-            "費玉清": { facts: ["小哥，歌壇長青樹，嗓音清澈優雅，儀態斯文穩重", "代表作《一剪梅》"], icon: "🎤", img: "https://pgw.udn.com.tw/gw/photo.php?u=/photo/2017/01/16/99/3075318.jpg&x=0&y=0&sw=0&sh=0&exp=3600" },
-            "高凌風": { facts: ["青蛙王子，舞台表演以前衛造型與動感舞步著稱", "代表作《燃燒吧！火鳥》"], icon: "🔥", img: "https://pgw.udn.com.tw/gw/photo.php?u=https://uc.udn.com.tw/photo/2025/09/07/105/33084812.png&x=0&y=0&sw=0&sh=0&sl=W&fw=800&exp=3600" },
-            "江蕙": { facts: ["二姐，台語歌壇不朽天后，蟬聯四屆金曲獎最佳女歌手", "代表作《家後》唱出無數台人情感"], icon: "🏺", img: "https://cdn2.ettoday.net/images/1197/d1197494.jpg" },
-            "豬哥亮": { facts: ["秀場天王，招牌馬桶蓋髮型與幽默口條風靡全台", "台灣特有的錄影帶文化標誌"], icon: "📺", img: "https://s.yimg.com/ny/api/res/1.2/JyEVfHbuw19ufoH6ReW8.w--/YXBwaWQ9aGlnaGxhbmRlcjt3PTY0MDtoPTQyNQ--/https://media.zenfs.com/ko/setn.com.tw/eac64b878661ebf531d93f28053d02a3" },
-            "余天": { facts: ["歌壇大哥大，嗓音雄渾大氣，以《榕樹下》紅遍大街小巷"], icon: "🌳", img: "https://assets.juksy.com/files/articles/89170/5ca3360edaa15.png" },
-            "甄妮": { facts: ["鐵肺天后，嗓音渾厚有力，曾獲首屆金鐘獎女歌星獎", "代表作《魯冰花》"], icon: "💎", img: "https://inews.gtimg.com/om_bt/OqldQwcBIDk71CkPUOKGub0ApJin7LHGwwyBM61NDMzwQAA/1000" },
-            "崔苔菁": { facts: ["一代妖姬，動感女神始祖，主持《翠笛銀箏》大受歡迎"], icon: "👑", img: "https://cc.tvbs.com.tw/img/program/upload/2021/11/09/20211109102935-2c413c18.jpg" },
-            "羅大佑": { facts: ["音樂教父，以深刻歌詞開創華語樂壇批判性創作新頁", "代表作《童年》"], icon: "🎸", img: "https://www.cna.com.tw/project/20210816-lotayu/img/lo3.jpg" },
-            "李宗盛": { facts: ["百萬製作人，擅長細膩描寫都會情感", "挖掘並成就了無數天王天后"], icon: "🎹", img: "https://www.mpweekly.com/entertainment/wp-content/uploads/2024/03/58-40thfeature-032-20240304042457.jpg?v=1709526298" },
-            "張學友": { facts: ["歌神，唱功精湛，專輯《吻別》創下華語銷量傳奇"], icon: "🎧", img: "https://attach.setn.com/newsimages/2023/07/22/4250577-PH.jpg" },
-            "劉德華": { facts: ["華仔，四大天王之一，以勤奮敬業與完美形象著稱", "代表作《忘情水》"], icon: "🌟", img: "https://attach.mobile01.com/attach/201901/mobile01-45bcb844fef3a02f13a9fd0c18c05482.jpg" },
-            "郭富城": { facts: ["舞王，動感舞姿風靡全亞洲", "代表作《對你愛不完》"], icon: "🕺", img: "https://attach.setn.com/newsimages/2019/04/05/1862047-XXL.jpg" },
-            "梅艷芳": { facts: ["百變天后，舞台造型極盡華麗，受封『香港的女兒』"], icon: "🌹", img: "https://resize-image.vocus.cc/resize?norotation=true&quality=80&url=https%3A%2F%2Fimages.vocus.cc%2F5986777f-c790-408f-9571-e7085b10b5e4.jpg&width=576&sign=92LD0t4Ax2dmFy2UwLsAvGG2MnvoEfxOQoIT4nmwkZs" },
-            "張國榮": { facts: ["哥哥，藝術氣息濃厚的影視巨星，演技與唱功俱佳"], icon: "📽️", img: "https://media.vogue.com.tw/photos/627c90d7ca862aa43bb3b330/2:3/w_2560%2Cc_limit/1126744768" },
-            "林青霞": { facts: ["影壇女神，從少女演到東方不敗，美貌跨越時空"], icon: "🎞️", img: "https://media.vogue.com.tw/photos/5fbcf0c04ae5fd444836bc99/master/w_1600%2Cc_limit/698d0ac9ly1gkt3xnzb30j20j20xjgqs.jpg" },
-            "蔡琴": { facts: ["絲絨歌后，嗓音低沉醇厚，代表作《恰似你的溫柔》"], icon: "🍷", img: "https://p0.itc.cn/images01/20230321/aa43f8ca23d846a4877793fcb2a46ce3.jpeg" },
-            "潘越雲": { facts: ["文藝歌后，唱腔迷幻細膩，代表作《天天天藍》"], icon: "🥀", img: "https://cc.tvbs.com.tw/img/program/upload/2021/07/28/20210728235910-c34e8526.jpg" },
-            "任賢齊": { facts: ["國民好男人，形象親切健康，代表作《心太軟》"], icon: "🚲", img: "https://i.kfs.io/album/global/132465089,0v1/fit/500x500.jpg" },
-            "伍佰": { facts: ["搖滾天王，與China Blue開創了台式搖滾新巔峰"], icon: "⚡", img: "https://doqvf81n9htmm.cloudfront.net/data/nellhung_175/images/2023/09/0924/5.jpg" },
-            "張清芳": { facts: ["東方不敗歌后，嗓音清亮高亢，80-90年代暢銷紀錄保持人"], icon: "🎶", img: "https://pgw.udn.com.tw/gw/photo.php?u=https://uc.udn.com.tw/photo/2022/02/24/0/16118165.jpg&x=0&y=0&sw=0&sh=0&exp=3600" },
-            "小虎隊": { facts: ["青春偶像始祖，引發全亞洲追星狂熱"], icon: "🐯", img: "https://lineimgomusic.com.tw/img/album/1284561.jpg?v=20200328110655" }
-        };
-
-        let artists = Object.keys(artistDatabase);
-        let drawnArtists = [];
-        let isSoundEnabled = true;
-        let lastWinner = "";
-
-        // 初始化
-        window.onload = () => {
-            renderArtistList();
-            document.getElementById('newArtist').onkeypress = (e) => e.key === 'Enter' && addArtist();
-        };
-
-        function toggleSound() {
-            isSoundEnabled = !isSoundEnabled;
-            document.getElementById('soundIcon').innerText = isSoundEnabled ? '🔊' : '🔇';
-        }
-
-        function renderArtistList() {
-            const container = document.getElementById('artistList');
-            document.getElementById('count').innerText = artists.length;
-            container.innerHTML = [...artists].sort().map(name => `
-                <div class="inline-flex items-center bg-slate-100 px-3 py-1 rounded-full text-sm font-bold border border-slate-200">
-                    ${name}
-                    <button onclick="removeArtist('${name}')" class="ml-2 text-red-400 hover:text-red-600">×</button>
-                </div>
-            `).join('');
-        }
-
-        function addArtist() {
-            const name = document.getElementById('newArtist').value.trim();
-            if (name && !artists.includes(name)) {
-                artists.push(name);
-                document.getElementById('newArtist').value = '';
-                renderArtistList();
-            }
-        }
-
-        function removeArtist(name) {
-            artists = artists.filter(a => a !== name);
-            renderArtistList();
-        }
-
-        function startDraw() {
-            const remaining = artists.filter(a => !drawnArtists.includes(a));
-            if (remaining.length === 0) return alert("全部都抽完了！");
-
-            const btn = document.getElementById('drawBtn');
-            const display = document.getElementById('drawDisplay');
-            btn.disabled = true;
-            display.classList.add('animate-roll');
-
-            let counter = 0;
-            const interval = setInterval(() => {
-                display.innerText = remaining[Math.floor(Math.random() * remaining.length)];
-                if (++counter > 20) {
-                    clearInterval(interval);
-                    const winner = remaining[Math.floor(Math.random() * remaining.length)];
-                    display.innerText = winner;
-                    display.classList.remove('animate-roll');
-                    drawnArtists.push(winner);
-                    lastWinner = winner;
-                    updateHistory();
-                    btn.disabled = false;
-                    document.getElementById('speakBtn').classList.remove('hidden');
-                    setTimeout(() => showArtistDetail(winner), 500);
+            minimapRef.current = new window.google.maps.Map(minimapContainerRef.current, {
+              center: { lat: startSpot.lat, lng: startSpot.lng },
+              zoom: 16,
+              disableDefaultUI: true, 
+              draggable: false,       
+              keyboardShortcuts: false,
+              clickableIcons: false,
+              styles: [
+                {
+                  featureType: "poi",
+                  stylers: [{ visibility: "off" }] 
+                },
+                {
+                  featureType: "transit",
+                  stylers: [{ visibility: "off" }] 
                 }
-            }, 80);
-        }
+              ]
+            });
 
-        function updateHistory() {
-            const history = document.getElementById('historyList');
-            history.innerHTML = drawnArtists.slice().reverse().map(n => `
-                <span class="bg-indigo-600 text-white px-4 py-2 rounded-xl font-bold shadow-sm">${n}</span>
-            `).join('') || '<p class="text-slate-300 italic font-medium">尚未開始抽籤...</p>';
-        }
+            playerMarkerRef.current = new window.google.maps.Marker({
+              position: { lat: startSpot.lat, lng: startSpot.lng },
+              map: minimapRef.current,
+              icon: {
+                path: window.google.maps.SymbolPath.FORWARD_CLOSED_ARROW,
+                scale: 5,
+                fillColor: '#10b981', 
+                fillOpacity: 1,
+                strokeWeight: 2,
+                strokeColor: '#ffffff',
+                rotation: 135
+              },
+              zIndex: 999
+            });
 
-        function resetDraw() {
-            if(confirm("確定要重置抽籤紀錄嗎？")) {
-                drawnArtists = [];
-                lastWinner = "";
-                document.getElementById('drawDisplay').innerText = "準備開始";
-                document.getElementById('speakBtn').classList.add('hidden');
-                updateHistory();
-            }
-        }
-
-        function showArtistDetail(name) {
-            const modal = document.getElementById('artistModal');
-            document.getElementById('modalTitle').innerText = name;
-            const data = artistDatabase[name] || { facts: ["備受歡迎的經典藝人。"], img: "" };
-            
-            document.getElementById('modalFacts').innerHTML = data.facts.map(f => `<p>✦ ${f}</p>`).join('');
-            const img = document.getElementById('modalImg');
-            if (data.img) {
-                img.src = data.img;
-                document.getElementById('photoBtn').classList.remove('hidden');
-            } else {
-                document.getElementById('photoBtn').classList.add('hidden');
-            }
-            
-            modal.classList.remove('hidden');
-            if (isSoundEnabled) speakText(name);
-        }
-
-        function togglePhotoView() {
-            document.getElementById('modalContentFacts').classList.toggle('hidden');
-            document.getElementById('modalContentPhoto').classList.toggle('hidden');
-        }
-
-        function closeModal() {
-            document.getElementById('artistModal').classList.add('hidden');
-            document.getElementById('modalContentFacts').classList.remove('hidden');
-            document.getElementById('modalContentPhoto').classList.add('hidden');
-        }
-
-        function speakCurrent() {
-            if (lastWinner) speakText(lastWinner);
-        }
-
-        function speakText(text) {
-            if ('speechSynthesis' in window) {
-                const utterance = new SpeechSynthesisUtterance(text);
-                utterance.lang = 'zh-TW';
-                utterance.rate = 0.8;
-                window.speechSynthesis.speak(utterance);
-            }
-        }
-
-        function generateCards() {
-            if (artists.length < 16) return alert("名單不足 16 位，無法生成賓果卡！");
-            const count = parseInt(document.getElementById('cardCount').value);
-            const area = document.getElementById('printArea');
-            area.innerHTML = '';
-
-            for (let i = 0; i < count; i++) {
-                const card = document.createElement('div');
-                card.className = 'bingo-card shadow-2xl';
-                const pool = [...artists].sort(() => Math.random() - 0.5).slice(0, 16);
+            panorama.addListener('position_changed', () => {
+              const pos = panorama.getPosition();
+              if (pos) {
+                if (initialLoadRef.current) {
+                  initialLoadRef.current = false;
+                } else {
+                  checkProximity(pos.lat(), pos.lng());
+                }
                 
-                card.innerHTML = `
-                    <div class="text-center mb-6">
-                        <h1 class="text-5xl font-black mb-2 text-slate-800">經典藝人賓果</h1>
-                        <p class="text-xl text-slate-500 font-bold italic mb-1">重溫黃金年代 ‧ 祝您連線大贏</p>
-                        <p class="text-sm text-slate-400 font-bold">規則：抽出名字後在格子上畫圈，集滿連線即獲勝</p>
-                    </div>
-                    <div class="bingo-grid">${pool.map(n => `<div class="bingo-cell" onclick="this.classList.toggle('marked')">${n}</div>`).join('')}</div>
-                    <div class="mt-8 flex justify-between items-end border-t-2 border-slate-100 pt-6">
-                        <div>
-                            <div class="text-sm font-black text-slate-300">編號：#${(i+1).toString().padStart(3,'0')}</div>
-                            <div class="text-xs font-bold text-slate-300">設計：鍾孟修 職能治療師</div>
-                        </div>
-                        <div class="text-2xl font-black text-slate-800">姓名：_________________</div>
-                    </div>
-                `;
-                area.appendChild(card);
-            }
-            window.scrollTo({ top: area.offsetTop - 50, behavior: 'smooth' });
+                if (minimapRef.current) minimapRef.current.setCenter(pos);
+                if (playerMarkerRef.current) playerMarkerRef.current.setPosition(pos);
+              }
+            });
+
+            panorama.addListener('pov_changed', () => {
+              if (playerMarkerRef.current) {
+                const pov = panorama.getPov();
+                const icon = playerMarkerRef.current.getIcon();
+                playerMarkerRef.current.setIcon({ ...icon, rotation: pov.heading });
+              }
+            });
+
+          } else {
+            console.error('無法找到官方街景路線');
+          }
         }
+      );
+    }
+  }, [gameState]);
 
-        async function downloadPDF() {
-            const originalCards = document.querySelectorAll('.bingo-card');
-            if (originalCards.length === 0) return alert("請先生成預覽！");
-
-            const overlay = document.getElementById('loadingOverlay');
-            const progress = document.getElementById('progressText');
-            overlay.classList.remove('hidden');
-
-            const { jsPDF } = window.jspdf;
-            const pdf = new jsPDF('p', 'mm', 'a4');
-
-            try {
-                for (let i = 0; i < originalCards.length; i++) {
-                    progress.innerText = `正在製作第 ${i+1} 頁...`;
-                    
-                    const clone = originalCards[i].cloneNode(true);
-                    clone.classList.add('download-standard');
-                    document.getElementById('download-clone-box').appendChild(clone);
-
-                    const canvas = await html2canvas(clone, {
-                        scale: 2,
-                        useCORS: true,
-                        backgroundColor: "#ffffff"
-                    });
-
-                    const imgData = canvas.toDataURL('image/jpeg', 0.9);
-                    if (i > 0) pdf.addPage();
-                    pdf.addImage(imgData, 'JPEG', 0, 0, 210, 297);
-                    
-                    document.getElementById('download-clone-box').innerHTML = '';
-                }
-                pdf.save(`經典藝人賓果_共${originalCards.length}張.pdf`);
-            } catch (err) {
-                console.error(err);
-                alert("生成 PDF 發生錯誤，請重試。");
-            } finally {
-                overlay.classList.add('hidden');
-            }
+  const checkProximity = useCallback((currentLat, currentLng) => {
+    setSpots(prevSpots => {
+      let changed = false;
+      let triggeredSpot = null;
+      
+      const newSpots = prevSpots.map(spot => {
+        if (!spot.visited) {
+          const distance = calculateDistance(currentLat, currentLng, spot.lat, spot.lng);
+          if (distance < 40 && !triggeredSpot) {
+            changed = true;
+            triggeredSpot = spot;
+            return { ...spot, visited: true };
+          }
         }
-    </script>
-</body>
-</html>
+        return spot;
+      });
+
+      if (triggeredSpot) {
+        setTimeout(() => triggerNotification(triggeredSpot), 0);
+      }
+      
+      return changed ? newSpots : prevSpots;
+    });
+  }, []);
+
+  const triggerNotification = (spot) => {
+    setCurrentSpot(spot);
+    setQuizStep('question'); 
+    setWrongAns(null);       
+    setShowNotification(true);
+  };
+
+  const handleAnswer = (index) => {
+    if (index === currentSpot.correct) {
+      setQuizStep('correct'); 
+      setWrongAns(null);
+    } else {
+      setWrongAns(index); 
+    }
+  };
+
+  const moveDirection = useCallback((relativeAngle) => {
+    if (!panoramaRef.current) return;
+    const pano = panoramaRef.current;
+    const links = pano.getLinks();
+    if (!links || links.length === 0) return;
+
+    const currentHeading = pano.getPov().heading;
+    const targetHeading = (currentHeading + relativeAngle + 360) % 360;
+
+    let closestLink = null;
+    let minDiff = 360;
+
+    const maxTolerance = (relativeAngle === 0 || relativeAngle === 180) ? 85 : 55;
+
+    links.forEach(link => {
+      let diff = Math.abs(link.heading - targetHeading);
+      if (diff > 180) diff = 360 - diff; 
+      if (diff < minDiff && diff < maxTolerance) {
+        minDiff = diff;
+        closestLink = link;
+      }
+    });
+
+    if (closestLink) {
+      pano.setPano(closestLink.pano);
+      
+      if (relativeAngle === -90 || relativeAngle === 90) {
+        pano.setPov({
+          heading: closestLink.heading, 
+          pitch: pano.getPov().pitch
+        });
+      }
+    }
+  }, []);
+
+  const turnCamera = useCallback((angleDelta) => {
+    if (!panoramaRef.current) return;
+    const pano = panoramaRef.current;
+    const pov = pano.getPov();
+    pano.setPov({ ...pov, heading: pov.heading + angleDelta });
+  }, []);
+
+  useEffect(() => {
+    if (gameState !== 'playing') return;
+
+    const handleKeyDown = (e) => {
+      if(["ArrowUp","ArrowDown","ArrowLeft","ArrowRight"," "].indexOf(e.key) > -1) {
+          e.preventDefault();
+      }
+
+      switch (e.key) {
+        case 'ArrowUp':
+        case 'w':
+        case 'W':
+          moveDirection(0);
+          break;
+        case 'ArrowDown':
+        case 's':
+        case 'S':
+          moveDirection(180);
+          break;
+        case 'ArrowLeft':
+        case 'a':
+        case 'A':
+          moveDirection(-90);
+          break;
+        case 'ArrowRight':
+        case 'd':
+        case 'D':
+          moveDirection(90);
+          break;
+        case 'q':
+        case 'Q':
+          turnCamera(-15);
+          break;
+        case 'e':
+        case 'E':
+          turnCamera(15);
+          break;
+        default:
+          break;
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [gameState, moveDirection, turnCamera]);
+
+
+  if (gameState === 'welcome') {
+    return (
+      <div className="min-h-screen bg-slate-900 text-white flex flex-col items-center justify-center p-4">
+        <div className="max-w-xl w-full bg-slate-800 rounded-2xl p-8 shadow-2xl border border-slate-700">
+          <div className="flex justify-center mb-6">
+            <div className="bg-emerald-500 p-4 rounded-full shadow-lg shadow-emerald-500/30 flex items-center justify-center w-20 h-20">
+              <span className="text-4xl">🧭</span>
+            </div>
+          </div>
+          <h1 className="text-3xl font-bold text-center mb-2">漫步台中中區</h1>
+          <p className="text-slate-400 text-center mb-8">第一人稱社區據點探索實境遊戲</p>
+
+          <div className="bg-slate-700/50 p-6 rounded-xl mb-8 border border-slate-600">
+            <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
+              <span className="text-xl">⌨️</span>
+              操作方式
+            </h2>
+            <div className="grid grid-cols-2 gap-4 text-sm text-slate-300">
+              <div className="flex items-center gap-3">
+                <kbd className="bg-slate-900 px-2 py-1 rounded border border-slate-600 font-mono">W / ↑</kbd> 往前走
+              </div>
+              <div className="flex items-center gap-3">
+                <kbd className="bg-slate-900 px-2 py-1 rounded border border-slate-600 font-mono">S / ↓</kbd> 往後退
+              </div>
+              <div className="flex items-center gap-3">
+                <kbd className="bg-slate-900 px-2 py-1 rounded border border-slate-600 font-mono">A / ←</kbd> 往左走(遇路口)
+              </div>
+              <div className="flex items-center gap-3">
+                <kbd className="bg-slate-900 px-2 py-1 rounded border border-slate-600 font-mono">D / →</kbd> 往右走(遇路口)
+              </div>
+              <div className="flex items-center gap-3">
+                <kbd className="bg-slate-900 px-2 py-1 rounded border border-slate-600 font-mono">Q</kbd> 視角左轉
+              </div>
+              <div className="flex items-center gap-3">
+                <kbd className="bg-slate-900 px-2 py-1 rounded border border-slate-600 font-mono">E</kbd> 視角右轉
+              </div>
+            </div>
+            <p className="mt-4 text-xs text-slate-400">任務：從火車站出發，在街道中實際穿梭，尋找隱藏的中區社區據點！</p>
+          </div>
+
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-slate-300 mb-2 flex items-center gap-2">
+                <span className="text-lg">🔑</span>
+                Google Maps API 金鑰
+              </label>
+              <input
+                type="text"
+                value={apiKey}
+                onChange={(e) => setApiKey(e.target.value)}
+                placeholder="輸入您的 API Key (需啟用 Street View API)"
+                className="w-full bg-slate-900 border border-slate-600 rounded-lg px-4 py-3 text-white placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500 transition-all"
+              />
+              {errorMsg && <p className="text-red-400 text-sm mt-2">{errorMsg}</p>}
+              <p className="text-xs text-slate-500 mt-2">
+                *為了載入真實街景圖，必須提供 API Key。此應用程式僅在您的瀏覽器端運行，不會儲存您的金鑰。
+              </p>
+            </div>
+
+            <button
+              onClick={startGame}
+              disabled={loading}
+              className="w-full bg-emerald-600 hover:bg-emerald-500 disabled:bg-slate-600 text-white font-bold py-4 rounded-lg flex items-center justify-center gap-2 transition-colors"
+            >
+              {loading ? '載入實境中...' : (
+                <>
+                  <span className="text-lg">▶️</span>
+                  進入中區街道
+                </>
+              )}
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  const visitedCount = spots.filter(s => s.visited).length;
+
+  return (
+    <div className="relative w-full h-screen bg-black overflow-hidden select-none">
+      <div ref={mapContainerRef} className="absolute inset-0 z-0" />
+
+      <div className="absolute top-4 left-4 right-4 z-10 flex justify-between items-start pointer-events-none">
+        <div className="bg-slate-900/80 backdrop-blur-md border border-slate-700/50 p-4 rounded-2xl w-72 pointer-events-auto shadow-2xl max-h-[85vh] overflow-y-auto">
+          <h2 className="text-white font-bold text-lg mb-3 flex items-center gap-2 sticky top-0 bg-slate-900/90 py-1">
+            <span className="text-xl">🗺️</span>
+            中區探索 ({visitedCount}/{spots.length})
+          </h2>
+          <div className="space-y-3">
+            {spots.map((spot) => (
+              <div key={spot.id} className={`flex items-start gap-3 text-sm ${spot.visited ? 'text-white' : 'text-slate-500'}`}>
+                {spot.visited ? (
+                  <span className="shrink-0 mt-0.5 text-emerald-400 text-base leading-none">✅</span>
+                ) : (
+                  <div className="w-[18px] h-[18px] rounded-full border-2 border-slate-600 shrink-0 mt-0.5" />
+                )}
+                <div>
+                  <div className="font-medium">{spot.visited ? spot.name : '??? (未探索)'}</div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      <div className="absolute bottom-6 left-6 z-10 w-40 h-40 md:w-48 md:h-48 rounded-2xl border-4 border-slate-800 shadow-2xl overflow-hidden bg-slate-800 pointer-events-none">
+        <div ref={minimapContainerRef} className="w-full h-full" />
+      </div>
+
+      <div className="absolute bottom-6 left-0 right-0 z-10 flex flex-col items-center pointer-events-none">
+        <div className="grid grid-cols-3 gap-2 w-48 h-48 bg-slate-900/40 backdrop-blur p-4 rounded-full border border-white/10 pointer-events-auto shadow-2xl">
+          <button onClick={() => turnCamera(-15)} className="bg-white/10 hover:bg-white/20 rounded-xl flex flex-col items-center justify-center active:bg-white/30 transition-colors text-white">
+            <span className="text-xl font-bold leading-none">↺</span>
+            <span className="text-[10px] text-emerald-400 font-mono mt-1 font-bold">Q</span>
+          </button>
+          <button onClick={() => moveDirection(0)} className="bg-white/10 hover:bg-white/20 rounded-xl flex flex-col items-center justify-center active:bg-white/30 transition-colors text-white">
+            <div className="w-0 h-0 border-l-[8px] border-l-transparent border-r-[8px] border-r-transparent border-b-[12px] border-b-white mb-1"></div>
+            <span className="text-[10px] text-emerald-400 font-mono font-bold mt-1">W</span>
+          </button>
+          <button onClick={() => turnCamera(15)} className="bg-white/10 hover:bg-white/20 rounded-xl flex flex-col items-center justify-center active:bg-white/30 transition-colors text-white">
+            <span className="text-xl font-bold leading-none">↻</span>
+            <span className="text-[10px] text-emerald-400 font-mono mt-1 font-bold">E</span>
+          </button>
+          
+          <button onClick={() => moveDirection(-90)} className="bg-white/10 hover:bg-white/20 rounded-xl flex flex-col items-center justify-center active:bg-white/30 transition-colors text-white">
+            <div className="w-0 h-0 border-t-[8px] border-t-transparent border-b-[8px] border-b-transparent border-r-[12px] border-r-white mb-1"></div>
+            <span className="text-[10px] text-emerald-400 font-mono font-bold mt-1">A</span>
+          </button>
+          <div className="flex items-center justify-center opacity-80 text-3xl">
+            🧭
+          </div>
+          <button onClick={() => moveDirection(90)} className="bg-white/10 hover:bg-white/20 rounded-xl flex flex-col items-center justify-center active:bg-white/30 transition-colors text-white">
+            <div className="w-0 h-0 border-t-[8px] border-t-transparent border-b-[8px] border-b-transparent border-l-[12px] border-l-white mb-1"></div>
+            <span className="text-[10px] text-emerald-400 font-mono font-bold mt-1">D</span>
+          </button>
+          
+          <div />
+          <button onClick={() => moveDirection(180)} className="bg-white/10 hover:bg-white/20 rounded-xl flex flex-col items-center justify-center active:bg-white/30 transition-colors text-white">
+            <div className="w-0 h-0 border-l-[8px] border-l-transparent border-r-[8px] border-r-transparent border-t-[12px] border-t-white mb-1"></div>
+            <span className="text-[10px] text-emerald-400 font-mono font-bold mt-1">S</span>
+          </button>
+          <div />
+        </div>
+      </div>
+
+      {showNotification && currentSpot && (
+        <div className="absolute inset-0 z-50 flex items-center justify-center pointer-events-none bg-black/40 backdrop-blur-sm p-4 md:p-8">
+          <div className={`bg-slate-900/95 border-2 border-emerald-500 p-6 sm:p-8 rounded-3xl w-full shadow-[0_0_50px_rgba(16,185,129,0.3)] transform animate-bounce-in pointer-events-auto max-h-[95vh] overflow-y-auto transition-all duration-500 ${quizStep === 'question' ? 'max-w-xl' : 'max-w-5xl'}`}>
+            {quizStep === 'question' ? (
+              <>
+                <div className="flex justify-center mb-4">
+                  <div className="bg-emerald-500/20 p-4 rounded-full flex items-center justify-center w-20 h-20">
+                    <span className="text-4xl">❓</span>
+                  </div>
+                </div>
+                <h3 className="text-emerald-400 font-bold text-center text-sm tracking-widest mb-1">發現新據點：{currentSpot.name}</h3>
+                <h2 className="text-white text-xl font-bold text-center mb-6 leading-relaxed">{currentSpot.question}</h2>
+                <div className="space-y-3">
+                  {currentSpot.options.map((option, idx) => (
+                    <button
+                      key={idx}
+                      onClick={() => handleAnswer(idx)}
+                      className={`w-full p-4 rounded-xl text-left font-medium transition-all duration-200 ${
+                        wrongAns === idx 
+                          ? 'bg-red-500/20 border-red-500 text-red-200 border animate-pulse' 
+                          : 'bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 hover:border-emerald-500'
+                      }`}
+                    >
+                      <span className="mr-3 text-emerald-500 font-bold">{['A', 'B', 'C', 'D'][idx]}</span>
+                      {option}
+                    </button>
+                  ))}
+                </div>
+                {wrongAns !== null && (
+                  <p className="text-red-400 text-center text-sm mt-4 animate-bounce">哎呀，答錯囉！再試一次看看～</p>
+                )}
+              </>
+            ) : (
+              <>
+                <div className="flex justify-center mb-4">
+                  <div className="bg-emerald-500/20 p-4 rounded-full flex items-center justify-center w-20 h-20">
+                    <span className="text-4xl">🎉</span>
+                  </div>
+                </div>
+                <h3 className="text-emerald-400 font-bold text-center text-sm tracking-widest mb-1">恭喜答對！</h3>
+                <h2 className="text-white text-3xl font-bold text-center mb-6">{currentSpot.name}</h2>
+                
+                <div className="flex flex-col md:flex-row gap-4 sm:gap-6 mb-6">
+                  <div className="flex-1 flex flex-col items-center w-full">
+                    <span className="text-slate-400 text-xs sm:text-sm font-bold mb-2 tracking-widest">【昔日】</span>
+                    <img src={currentSpot.pastImg} alt={`${currentSpot.name}昔日`} className="w-full h-64 sm:h-80 lg:h-[400px] object-cover rounded-xl border-2 border-slate-600 shadow-inner" />
+                  </div>
+                  <div className="flex-1 flex flex-col items-center w-full">
+                    <span className="text-emerald-400 text-xs sm:text-sm font-bold mb-2 tracking-widest">【今日】</span>
+                    <img src={currentSpot.presentImg} alt={`${currentSpot.name}今日`} className="w-full h-64 sm:h-80 lg:h-[400px] object-cover rounded-xl border-2 border-emerald-500 shadow-[0_0_15px_rgba(16,185,129,0.2)]" />
+                  </div>
+                </div>
+
+                <div className="bg-slate-800 rounded-xl p-5 text-slate-300 text-sm sm:text-base leading-relaxed flex gap-3">
+                  <span className="shrink-0 mt-0.5 text-lg leading-none">ℹ️</span>
+                  <p>{currentSpot.description}</p>
+                </div>
+                <button 
+                  onClick={() => {
+                    setShowNotification(false);
+                    if (spots.every(s => s.visited)) {
+                      setGameState('finished');
+                    }
+                  }}
+                  className="mt-6 w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-3 rounded-xl transition-colors text-lg"
+                >
+                  {spots.every(s => s.visited) ? '🎉 完成所有探索！' : '繼續探索'}
+                </button>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
+      {gameState === 'finished' && (
+        <div className="absolute inset-0 z-[60] flex items-center justify-center bg-slate-900/90 backdrop-blur-md p-4 sm:p-8 overflow-y-auto">
+          <div className="max-w-5xl w-full bg-slate-800 border-4 border-amber-400 p-8 sm:p-12 rounded-3xl shadow-[0_0_100px_rgba(251,191,36,0.4)] transform animate-bounce-in flex flex-col items-center my-auto">
+            <div className="text-7xl sm:text-8xl mb-6 animate-pulse">🏆</div>
+            <h1 className="text-4xl md:text-5xl font-bold text-amber-400 mb-4 text-center tracking-wide">尋寶大作戰 大成功！</h1>
+            <p className="text-slate-300 text-lg sm:text-xl mb-10 text-center leading-relaxed">
+              太棒了！您已經找齊了台中中區的 <span className="text-emerald-400 font-bold text-3xl mx-2">9</span> 個隱藏歷史據點，<br className="hidden sm:block"/>
+              完成這趟深度的時光漫步之旅！
+            </p>
+            
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4 w-full mb-10">
+              {spots.map(spot => (
+                <div key={spot.id} className="bg-slate-900 rounded-xl overflow-hidden border-2 border-emerald-500/50 flex flex-col items-center relative group">
+                  <div className="absolute top-2 right-2 z-10 bg-emerald-500 text-white text-[10px] sm:text-xs font-bold px-2 py-1 rounded-full shadow">
+                    達成
+                  </div>
+                  <img src={spot.presentImg} alt={spot.name} className="w-full h-24 sm:h-28 object-cover opacity-80 group-hover:opacity-100 transition-opacity" />
+                  <div className="p-3 w-full text-center text-sm sm:text-base font-bold text-emerald-400 truncate">
+                    {spot.name}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <button 
+              onClick={() => window.location.reload()}
+              className="bg-amber-500 hover:bg-amber-400 text-slate-900 font-bold py-4 px-12 rounded-full text-xl transition-transform hover:scale-105 shadow-xl"
+            >
+              再玩一次
+            </button>
+          </div>
+        </div>
+      )}
+
+      <style dangerouslySetInnerHTML={{__html: `
+        @keyframes bounce-in {
+          0% { transform: scale(0.8); opacity: 0; }
+          50% { transform: scale(1.05); opacity: 1; }
+          100% { transform: scale(1); opacity: 1; }
+        }
+        .animate-bounce-in {
+          animation: bounce-in 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+        }
+      `}} />
+    </div>
+  );
+}
+
+
